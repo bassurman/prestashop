@@ -371,14 +371,15 @@
         }
         e.preventDefault();
 
-    })
+    });
+
+    var isOnePageCheckout = false;
     if($('input[name="id_payment_method"]').length) {
         $(document).on('click', 'input[name="id_payment_method"]', function (element) {
-
             $('.payment-form').hide();
             var value = element.target.value;
 
-            if ($('#payment_' + value).parents('.item,.alternate_item').hasClass('fields')) {
+            if ($('#payment_' + value).parents('.item,.alternate_item').hasClass('fields') && isOnePageCheckout == false) {
 
 
                 $('#payment_' + value).parents('.item,.alternate_item').children('.payment_description').children('.payment-form').show();
@@ -397,6 +398,8 @@
                 }
 
             } else if ($('#' + value).parent('.payment_module').children('.payment-form')) {
+                // Using one page checkout module
+                isOnePageCheckout = true;
                 var el = $('#' + value).parent('.payment_module').children('.payment-form');
                 var method = el.attr('id');
                 //method = method.replace('-fields','');
