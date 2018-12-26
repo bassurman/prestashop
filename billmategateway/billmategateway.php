@@ -634,6 +634,12 @@ class BillmateGateway extends PaymentModule
                 }
             }
         }
+
+        try {
+            throw new PrestaShopException('Bad front controller chosen');
+        } catch (PrestaShopException $e) {
+            //$this->context->controller->errors[] = $e->getMessage();
+        }
     }
 
     /**
@@ -641,7 +647,6 @@ class BillmateGateway extends PaymentModule
      */
     public function hookActionOrderSlipAdd($params)
     {
-
         $order = $params['order'];
         $productList = $params['productList'];
         $testMode      = (boolean) $this->getMethodInfo($order->module, 'testMode');
@@ -789,7 +794,10 @@ class BillmateGateway extends PaymentModule
 
     public function hookActionOrderStatusUpdate($params)
     {
-        $orderStatus = Configuration::get('BILLMATE_ACTIVATE_STATUS');
+        $billmate_order = new BillmateOrder();
+        $billmate_order->updateStatusProcess($params);
+
+        /*$orderStatus = Configuration::get('BILLMATE_ACTIVATE_STATUS');
         $cancelStatus = Configuration::get('BILLMATE_CANCEL_STATUS');
         $activate    = Configuration::get('BILLMATE_ACTIVATE');
         $cancelStatus = unserialize($cancelStatus);
@@ -811,6 +819,7 @@ class BillmateGateway extends PaymentModule
                 'billmateinvoiceservice',
                 'billmatepartpay'
             );
+
 
             if (in_array($order->module, $modules) && in_array($id_status, $orderStatus) &&
                 $this->getMethodInfo($order->module, 'authorization_method', false) != 'sale') {
@@ -882,9 +891,7 @@ class BillmateGateway extends PaymentModule
                     }
                 }
             }
-        } else {
-            return;
-        }
+        }*/
     }
 
     public function hookDisplayPayment($params)
