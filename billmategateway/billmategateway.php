@@ -374,6 +374,9 @@ class BillmateGateway extends PaymentModule
 
     }
 
+    /**
+     * @return bool
+     */
     public function registerHooks()
     {
         $extra = true;
@@ -469,11 +472,10 @@ class BillmateGateway extends PaymentModule
         if ($order_id > 0) {
             $order = new Order($order_id);
             $result = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'billmate_payment_fees WHERE order_id = "'.$order->id.'"');
-            if($result){
-
+            if ($result) {
                 $payments = $order->getOrderPaymentCollection();
                 $currency = 0;
-                foreach($payments as $payment){
+                foreach($payments as $payment) {
                     $currency = $payment->id_currency;
                 }
                 $invoice_fee_tax    = $result['tax_rate'] / 100;
@@ -513,7 +515,6 @@ class BillmateGateway extends PaymentModule
 
     public function hookDisplayCustomerAccountFormTop($params)
     {
-
         if (Configuration::get('BILLMATE_GETADDRESS') AND Dispatcher::getInstance()->getController() == 'orderopc') {
             $this->smarty->assign('pno', (isset($this->context->cookie->billmatepno)) ? $this->context->cookie->billmatepno : '');
             return $this->display(__FILE__, 'getaddress.tpl');
@@ -578,11 +579,11 @@ class BillmateGateway extends PaymentModule
                 /**
                  * When invoice is unavailable and invoice service is available, use invoice service as invoice
                  */
-                if ($option['method'] == '2' AND !isset($paymentOptions['1'])) {
+                if ($option['method'] == '2' && !isset($paymentOptions['1'])) {
                     $mapCodeToMethod['2'] = 'invoice';
                 }
 
-                if(isset($mapCodeToMethod[$option['method']]) AND !in_array($mapCodeToMethod[$option['method']], $paymentOptions)) {
+                if(isset($mapCodeToMethod[$option['method']]) && !in_array($mapCodeToMethod[$option['method']], $paymentOptions)) {
                     $paymentOptions[$option['method']] = $mapCodeToMethod[$option['method']];
                 } else {
                     continue;
@@ -613,62 +614,24 @@ class BillmateGateway extends PaymentModule
 
     public function hookDisplayBackOfficeHeader()
     {
-        if (isset($this->context->cookie->error) && Tools::strlen($this->context->cookie->error) > 2) {
-            if (get_class($this->context->controller) == 'AdminOrdersController') {
-                $this->context->controller->errors[] = $this->context->cookie->error;
-                unset($this->context->cookie->error);
-                unset($this->context->cookie->error_orders);
-            }
-        }
-        if (isset($this->context->cookie->diff) && Tools::strlen($this->context->cookie->diff) > 2) {
-            if (get_class($this->context->controller) == 'AdminOrdersController') {
-                $this->context->controller->errors[] = $this->context->cookie->diff;
-                unset($this->context->cookie->diff);
-                unset($this->context->cookie->diff_orders);
-            }
-        }
-        if (isset($this->context->cookie->api_error) && Tools::strlen($this->context->cookie->api_error) > 2) {
-            if (get_class($this->context->controller) == 'AdminOrdersController') {
-                $this->context->controller->errors[] = $this->context->cookie->api_error;
-                unset($this->context->cookie->api_error);
-                unset($this->context->cookie->api_error_orders);
-            }
-        }
-        if (isset($this->context->cookie->information) && Tools::strlen($this->context->cookie->information) > 2) {
-            if (get_class($this->context->controller) == 'AdminOrdersController') {
-                $this->context->controller->warnings[] = $this->context->cookie->information;
-                unset($this->context->cookie->information);
-                unset($this->context->cookie->information_orders);
-            }
-        }
-        if (isset($this->context->cookie->confirmation) && Tools::strlen($this->context->cookie->confirmation) > 2) {
-            if (get_class($this->context->controller) == 'AdminOrdersController') {
-                $this->context->controller->confirmations[] = $this->context->cookie->confirmation;
-                unset($this->context->cookie->confirmation);
-                unset($this->context->cookie->confirmation_orders);
-            }
-        }
-        if (isset($this->context->cookie->credit_confirmation) &&
-            Tools::strlen($this->context->cookie->credit_confirmation) > 2) {
-            if (get_class($this->context->controller) == 'AdminOrdersController') {
-                $this->context->controller->confirmations[] = $this->context->cookie->credit_confirmation;
-                unset($this->context->cookie->credit_confirmation);
-                unset($this->context->cookie->credit_confirmation_orders);
-            }
-        }
-        if (isset($this->context->cookie->error_credit) && Tools::strlen($this->context->cookie->error_credit) > 2) {
-            if (get_class($this->context->controller) == 'AdminOrdersController') {
-                $this->context->controller->errors[] = $this->context->cookie->error_credit;
-                unset($this->context->cookie->error_credit);
-                unset($this->context->cookie->credit_orders);
-            }
-        }
-        if (isset($this->context->cookie->error_credit_activation) &&
-            Tools::strlen($this->context->cookie->error_credit_activation) > 2) {
-            if (get_class($this->context->controller) == 'AdminOrdersController') {
-                $this->context->controller->errors[] = $this->context->cookie->error_credit_activation;
-                unset($this->context->cookie->error_credit_activation);
-                unset($this->context->cookie->credit_activate_orders);
+        $listProperties = array(
+            'error' => 'error',
+            'diff' => 'diff',
+            'api_error' => 'api_error',
+            'information' => 'information',
+            'confirmation' => 'confirmation',
+            'credit_confirmation' => 'credit_confirmation',
+            'error_credit' => 'credit',
+            'error_credit_activation' => 'credit_activate',
+        );
+
+        foreach ($listProperties as $_property => $property_orders) {
+            if (isset($this->context->cookie->{$_property}) && Tools::strlen($this->context->cookie->{$_property}) > 2) {
+                if (get_class($this->context->controller) == 'AdminOrdersController') {
+                    $this->context->controller->errors[] = $this->context->cookie->{$_property};
+                    unset($this->context->cookie->{$_property});
+                    unset($this->context->cookie->{$property_orders.'_orders'});
+                }
             }
         }
     }
