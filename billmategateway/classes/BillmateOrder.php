@@ -153,7 +153,7 @@ class BillmateOrder extends Helper
      *
      * @return bool|
      */
-    public function getMethodInfo($name, $key, $checkIfAvailable = true)
+    public function getMethodInfo($name, $methodName, $checkIfAvailable = true)
     {
         if (is_null($this->activeMethod)) {
             $payments_methods = $this->configHelper->getPaymentModules();
@@ -170,8 +170,8 @@ class BillmateOrder extends Helper
             }
         }
 
-        if ($this->activeMethod && property_exists($this->activeMethod, $key)) {
-            return $this->activeMethod->{$key};
+        if ($this->activeMethod && property_exists($this->activeMethod, $methodName)) {
+            return $this->activeMethod->{$methodName};
         }
 
         return $this->activeMethod;

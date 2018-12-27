@@ -316,7 +316,9 @@ class BillmateGateway extends PaymentModule
             return false;
 
         if (!function_exists('curl_version')) {
-            $this->_errors[] = $this->l('Sorry, this module requires the cURL PHP Extension (http://www.php.net/curl), which is not enabled on your server. Please ask your hosting provider for assistance.');
+            $this->_errors[] = $this->l(
+                'Sorry, this module requires the cURL PHP Extension (http://www.php.net/curl), which is not enabled on your server. Please ask your hosting provider for assistance.'
+            );
             return false;
         }
 
@@ -579,7 +581,7 @@ class BillmateGateway extends PaymentModule
     {
         $order = $params['order'];
         $productList = $params['productList'];
-        $testMode      = (boolean) $this->getMethodInfo($order->module, 'testMode');
+        $testMode      = (boolean) $this->billmateOrder->getMethodInfo($order->module, 'testMode');
 
         $billmate = Common::getBillmate($this->billmate_merchant_id,$this->billmate_secret,$testMode);
         $payment = OrderPayment::getByOrderId($order->id);
@@ -765,7 +767,6 @@ class BillmateGateway extends PaymentModule
     public function hookPaymentOptions($params)
     {
         $methods = $this->getMethodOptions($params['cart']);
-       // $methods = $this->paymentModel->getMethodOptions(); /** prepare for refactoring */
         $this->smarty->assign(
             array(
                 'var'        => array(
@@ -837,40 +838,6 @@ class BillmateGateway extends PaymentModule
         }
         ksort($data);
         return $data;
-    }
-
-    public function getMethodInfo($name, $key, $checkIfAvailable = true)
-    {
-        $methodFiles = new FilesystemIterator(_PS_MODULE_DIR_.'billmategateway/methods', FilesystemIterator::SKIP_DOTS);
-
-        if ($checkIfAvailable ==  true) {
-            $paymentMethodsAvailable = $this->getAvailableMethods();
-        }
-
-        foreach ($methodFiles as $file)
-        {
-            $class = $file->getBasename('.php');
-            if ($class == 'index') {
-                continue;
-            }
-
-            if ($checkIfAvailable ==  true) {
-                if(!in_array(strtolower($class), $paymentMethodsAvailable)) {
-                    continue;
-                }
-            }
-
-            include_once($file->getPathname());
-
-            $class = "BillmateMethod".$class;
-            $method = new $class();
-
-            if ($method->name == $name) {
-                if (property_exists($method, $key)) {
-                    return $method->{$key};
-                }
-            }
-        }
     }
 
     public function getMethodSettings()
