@@ -17,7 +17,7 @@ class BillmatePayment
         $this->configHelper = new BmConfigHelper();
     }
 
-    public function getActiveMethods($cart)
+    public function getActiveMethods()
     {
         $cart = $this->getCart();
         $activeMethods = array();
@@ -53,6 +53,59 @@ class BillmatePayment
         }
         ksort($activeMethods);
         return $activeMethods;
+    }
+
+    public function getMethodOptions()
+    {
+        $cart = $this->getCart();
+        $data = array();
+
+        $methodFiles = new FilesystemIterator(_PS_MODULE_DIR_.'/billmategateway/methods', FilesystemIterator::SKIP_DOTS);
+        $paymentMethodsAvailable = $this->getAvailableMethods();
+
+        foreach ($methodFiles as $file) {
+            $class = $file->getBasename('.php');
+            if ($class == 'index') {
+                continue;
+            }
+
+            if(!in_array(strtolower($class),$paymentMethodsAvailable))
+                continue;
+
+            include_once($file->getPathname());
+
+            $class = "BillmateMethod".$class;
+            $method = new $class();
+            $result = $method->getPaymentInfo($cart);
+
+            if (!$result)
+                continue;
+            $newOption = new PrestaShop\PrestaShop\Core\Payment\PaymentOption();
+            try{
+                $this->smarty->assign($result);
+                $this->smarty->assign(array('eid' => Configuration::get('BILLMATE_ID')));
+                $this->smarty->escape_html = false;
+                $newOption->setModuleName($this->name)
+                    ->setCallToActionText($result['name'])
+                    ->setAction($result['controller'])
+                    ->setLogo($this->context->link->getBaseLink().'/modules/'.$result['icon'])
+                    ->setAdditionalInformation($this->fetch('module:billmategateway/views/templates/front/'.$result['type'].'.tpl'));
+
+            } catch(Exception $e){
+                die($e->getMessage()."\r\n".$e->getTraceAsString());
+            }
+            if ($result['sort_order']) {
+                if (array_key_exists($result['sort_order'], $data)) {
+                    $data[$result['sort_order'] + 1] = $newOption;
+                } else {
+                    $data[$result['sort_order']] = $newOption;
+                }
+            } else {
+                $data[] = $newOption;
+            }
+        }
+        ksort($data);
+        return $data;
     }
 
     /**

@@ -13,10 +13,19 @@ require_once(_PS_MODULE_DIR_.'/billmategateway/library/pclasses.php');
 
 class BillmateGateway extends PaymentModule
 {
-
     protected $allowed_currencies;
+
     protected $postValidations;
+
+    /**
+     * @var array
+     */
     protected $postErrors;
+
+    /**
+     * @var BillmateOrder
+     */
+    protected $billmateOrder;
 
     public function __construct()
     {
@@ -61,6 +70,7 @@ class BillmateGateway extends PaymentModule
         $this->context->smarty->assign('base_dir', __PS_BASE_URI__);
         $this->configHelper = new BmConfigHelper();
         $this->paymentModel = new BillmatePayment();
+        $this->billmateOrder = new BillmateOrder();
     }
 
     public function dummyTranslations()
@@ -71,15 +81,13 @@ class BillmateGateway extends PaymentModule
         $this->l('Billmate Partpay');
         $this->l('Discount %s%% VAT');
         $this->l('Discount');
-
     }
 
     public function getContent()
     {
         $html = '';
 
-        if (!empty($_POST) && Tools::getIsset('billmateSubmit'))
-        {
+        if (!empty($_POST) && Tools::getIsset('billmateSubmit')) {
             $this->_postValidation();
             if (isset($this->postValidations) && is_array($this->postValidations) && count($this->postValidations) > 0) {
                 $html .= $this->displayValidations();
@@ -88,11 +96,9 @@ class BillmateGateway extends PaymentModule
             if (isset($this->postErrors) && is_array($this->postErrors) && count($this->postErrors) > 0) {
                 $html .= $this->displayErrors();
             }
-
         }
 
         $html .= $this->displayAdminTemplate();
-
         return $html;
     }
 
@@ -241,15 +247,14 @@ class BillmateGateway extends PaymentModule
             return false;
         }
 
-
-        $billmate            = Common::getBillmate($eid, $secret, false);
-        $data                = array();
+        $billmate = Common::getBillmate($eid, $secret, false);
+        $data = array();
         $data['PaymentData'] = array(
             'currency' => 'SEK',
             'language' => 'sv',
             'country'  => 'se'
         );
-        $result              = $billmate->getPaymentplans($data);
+        $result = $billmate->getPaymentplans($data);
 
         if (isset($result['code']) && ($result['code'] == '9010' || $result['code'] == '9012' || $result['code'] == '9013')) {
             $this->postErrors[] = utf8_encode($result['message']);
@@ -372,7 +377,6 @@ class BillmateGateway extends PaymentModule
 
         Configuration::updateValue('BILLMATE_UPDATES',implode(',',$installed));
         Configuration::updateValue('BILLMATE_VERSION', $this->version);
-
     }
 
     /**
@@ -472,22 +476,12 @@ class BillmateGateway extends PaymentModule
 
         if ($order_id > 0) {
             $order = new Order($order_id);
-            $result = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'billmate_payment_fees WHERE order_id = "'.$order->id.'"');
-            if ($result) {
-                $payments = $order->getOrderPaymentCollection();
-                $currency = 0;
-                foreach($payments as $payment) {
-                    $currency = $payment->id_currency;
-                }
-                $invoice_fee_tax    = $result['tax_rate'] / 100;
-                $invoice_fee        = $result['invoice_fee'];
-                $billmatetax        = $result['invoice_fee'] * $invoice_fee_tax;
+            $fees = $this->billmateOrder->getPaymentFees($order);
 
-                $total_fee = $invoice_fee + $billmatetax;
-
-                $this->smarty->assign('invoiceFeeIncl', $total_fee);
-                $this->smarty->assign('invoiceFeeTax', $billmatetax);
-                $this->smarty->assign('invoiceFeeCurrency',$currency);
+            if ($fees) {
+                $this->smarty->assign('invoiceFeeIncl', $fees['invoiceFeeIncl']);
+                $this->smarty->assign('invoiceFeeTax', $fees['invoiceFeeTax']);
+                $this->smarty->assign('invoiceFeeCurrency', $fees['invoiceFeeCurrency']);
                 $this->smarty->assign('order', $order);
 
                 return $this->display(__FILE__, 'invoicefee.tpl');
@@ -499,15 +493,12 @@ class BillmateGateway extends PaymentModule
     public function hookDisplayPdfInvoice($params)
     {
         $order = new Order($params['object']->id_order);
-        $result = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'billmate_payment_fees WHERE order_id = "'.$order->id.'"');
-        if ($result) {
-            $invoice_fee_tax = $result['tax_rate'] / 100;
-            $invoice_fee = $result['invoice_fee'];
-            $billmatetax = $result['invoice_fee'] * $invoice_fee_tax;
-            $total_fee = $invoice_fee + $billmatetax;
 
-            $this->smarty->assign('invoiceFeeIncl', $total_fee);
-            $this->smarty->assign('invoiceFeeTax', $billmatetax);
+        $fees = $this->billmateOrder->getPaymentFees($order);
+
+        if ($fees) {
+            $this->smarty->assign('invoiceFeeIncl', $fees['invoiceFeeIncl']);
+            $this->smarty->assign('invoiceFeeTax', $fees['invoiceFeeTax']);
             $this->smarty->assign('order', $order);
 
             return $this->display(__FILE__, 'invoicefeepdf.tpl');
@@ -536,22 +527,11 @@ class BillmateGateway extends PaymentModule
         }
 
         $order = new Order($order_id);
-        $result = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'billmate_payment_fees WHERE order_id = "'.$order->id.'"');
-        if ($result) {
-            $payments = $order->getOrderPaymentCollection();
-            $currency = 0;
-            foreach ($payments as $payment) {
-                $currency = $payment->id_currency;
-            }
-            $invoice_fee_tax = $result['tax_rate'] / 100;
-            $invoice_fee = $result['invoice_fee'];
-            $billmatetax = $result['invoice_fee'] * $invoice_fee_tax;
-
-            $total_fee = $invoice_fee + $billmatetax;
-
-            $this->smarty->assign('invoiceFeeIncl', $total_fee);
-            $this->smarty->assign('invoiceFeeTax', $billmatetax);
-            $this->smarty->assign('invoiceFeeCurrency',$currency);
+        $fees = $this->billmateOrder->getPaymentFees($order);
+        if ($fees) {
+            $this->smarty->assign('invoiceFeeIncl', $fees['invoiceFeeIncl']);
+            $this->smarty->assign('invoiceFeeTax', $fees['invoiceFeeTax']);
+            $this->smarty->assign('invoiceFeeCurrency', $fees['invoiceFeeCurrency']);
             $this->smarty->assign('order', $order);
 
             return $this->display(__FILE__, 'invoicefee.tpl');
@@ -560,57 +540,12 @@ class BillmateGateway extends PaymentModule
         }
     }
 
+    /**
+     * @return array
+     */
     public function getAvailableMethods()
     {
-        if ($this->billmate_merchant_id && $this->billmate_secret) {
-            $billmate = Common::getBillmate($this->billmate_merchant_id, $this->billmate_secret, false);
-            $result = $billmate->getAccountinfo(array('time' => time()));
-
-            $mapCodeToMethod = array(
-                1 => 'invoice',
-                2 => 'invoiceservice',
-                4 => 'partpay',
-                8 => 'cardpay',
-                16 => 'bankpay'
-            );
-            $paymentOptions = array();
-            $logfile   = _PS_CACHE_DIR_.'Billmate.log';
-            file_put_contents($logfile, print_r($result['paymentoptions'],true),FILE_APPEND);
-            foreach ($result['paymentoptions'] as $option) {
-                /**
-                 * When invoice is unavailable and invoice service is available, use invoice service as invoice
-                 */
-                if ($option['method'] == '2' && !isset($paymentOptions['1'])) {
-                    $mapCodeToMethod['2'] = 'invoice';
-                }
-
-                if(isset($mapCodeToMethod[$option['method']]) && !in_array($mapCodeToMethod[$option['method']], $paymentOptions)) {
-                    $paymentOptions[$option['method']] = $mapCodeToMethod[$option['method']];
-                } else {
-                    continue;
-                }
-            }
-            // Add checkout as payment option if available
-            if (isset($result['checkout']) AND $result['checkout']) {
-                $paymentOptions['checkout'] = 'checkout';
-            }
-
-            /**
-             * @param int 1|2 The mehtod that will be used in addPayment request when customer pay with invoice
-             * Method 1 = Invoice , 2 = Invoice service
-             * Is affected by available payment methods in result from getaccountinfo
-             * - Default method 1
-             * - Invoice available, use method 1
-             * - Invoice and invoiceservice available, use method 1
-             * - Invoice service availavble and invoice unavailable, use method 2
-             */
-            $invoiceMethod = (!isset($paymentOptions[1]) && isset($paymentOptions[2])) ? 2 : 1;
-            Configuration::updateValue('BINVOICESERVICE_METHOD', $invoiceMethod);
-
-            return $paymentOptions;
-        } else {
-            return array();
-        }
+        return $this->configHelper->getAvailableMethods();
     }
 
     public function hookDisplayBackOfficeHeader()
@@ -634,12 +569,6 @@ class BillmateGateway extends PaymentModule
                     unset($this->context->cookie->{$property_orders.'_orders'});
                 }
             }
-        }
-
-        try {
-            throw new PrestaShopException('Bad front controller chosen');
-        } catch (PrestaShopException $e) {
-            //$this->context->controller->errors[] = $e->getMessage();
         }
     }
 
@@ -795,8 +724,7 @@ class BillmateGateway extends PaymentModule
 
     public function hookActionOrderStatusUpdate($params)
     {
-        $billmate_order = new BillmateOrder();
-        $billmate_order->updateStatusProcess($params);
+        $this->billmateOrder->updateStatusProcess($params);
     }
 
     public function hookDisplayPayment($params)
@@ -806,7 +734,7 @@ class BillmateGateway extends PaymentModule
 
     public function hookPayment($params)
     {
-        $methods = $this->paymentModel->getActiveMethods($params['cart']);
+        $methods = $this->paymentModel->getActiveMethods();
 
         $template = 'new';
         if (version_compare(_PS_VERSION_, '1.6', '<')) {
@@ -837,6 +765,7 @@ class BillmateGateway extends PaymentModule
     public function hookPaymentOptions($params)
     {
         $methods = $this->getMethodOptions($params['cart']);
+       // $methods = $this->paymentModel->getMethodOptions(); /** prepare for refactoring */
         $this->smarty->assign(
             array(
                 'var'        => array(

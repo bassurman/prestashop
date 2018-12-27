@@ -177,6 +177,30 @@ class BillmateOrder extends Helper
         return $this->activeMethod;
     }
 
+
+    public function getPaymentFees($order)
+    {
+        $result = Db::getInstance()->getRow(
+            'SELECT * FROM '._DB_PREFIX_.'billmate_payment_fees WHERE order_id = "' . (int)$order->id . '"'
+        );
+        $fees = array();
+        if ($result) {
+            $payments = $order->getOrderPaymentCollection();
+            $currency = 0;
+            foreach($payments as $payment) {
+                $currency = $payment->id_currency;
+            }
+            $invoice_fee_tax    = $result['tax_rate'] / 100;
+            $invoice_fee        = $result['invoice_fee'];
+            $billmatetax        = $result['invoice_fee'] * $invoice_fee_tax;
+            $total_fee = $invoice_fee + $billmatetax;
+            $fees['invoiceFeeIncl'] = $total_fee;
+            $fees['invoiceFeeTax'] = $billmatetax;
+            $fees['invoiceFeeCurrency'] = $currency;
+        }
+
+        return $fees;
+    }
     /**
      * @return array
      */
