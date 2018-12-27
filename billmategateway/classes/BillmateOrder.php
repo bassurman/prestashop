@@ -25,26 +25,15 @@ class BillmateOrder extends Helper
         'handling'
     );
 
-    /**
-     * @var array
-     */
-    protected $mapPaymentMethods = array(
-        1 => 'invoice',
-        2 => 'invoiceservice',
-        4 => 'partpay',
-        8 => 'cardpay',
-        16 => 'bankpay'
-    );
-
     public function __construct()
     {
         $this->context = Context::getContext();
-        $this->config_helper = new BmConfigHelper();
+        $this->configHelper = new BmConfigHelper();
     }
 
     public function updateStatusProcess($params)
     {
-        $orderStatuses = $this->config_helper->getBMActivateStatuses();
+        $orderStatuses = $this->configHelper->getBMActivateStatuses();
 
         $activate    = Configuration::get('BILLMATE_ACTIVATE');
 
@@ -60,13 +49,13 @@ class BillmateOrder extends Helper
             $payment = OrderPayment::getByOrderId($order_id);
             $transactionId = $payment[0]->transaction_id;
 
-            $paymentModules           = $this->config_helper->getPaymentModules(true);
+            $paymentModules           = $this->configHelper->getPaymentModules(true);
             $allowed_payment_statuses = $this->getPaymentStatuses();
             $methodInfo               = $this->getMethodInfo($order->module, 'authorization_method', false);
 
             if (in_array($order->module, $paymentModules)) {
                 $testMode = $this->getMethodInfo($order->module, 'testMode', false);
-                $bmConnection = $this->config_helper->getBillmateConnection($testMode);
+                $bmConnection = $this->configHelper->getBillmateConnection($testMode);
                 $paymentInfo   = $bmConnection->getPaymentinfo(array('number' => $transactionId));
 
                 if (in_array($idStatus, $orderStatuses) && $methodInfo != self::SALE_METHOD_INFO) {
@@ -167,7 +156,7 @@ class BillmateOrder extends Helper
     public function getMethodInfo($name, $key, $checkIfAvailable = true)
     {
         if (is_null($this->activeMethod)) {
-            $payments_methods = $this->config_helper->getPaymentModules();
+            $payments_methods = $this->configHelper->getPaymentModules();
             if (isset($payments_methods[$name])) {
                 $methodClass = $payments_methods[$name];
                 $this->activeMethod = new $methodClass();
@@ -193,50 +182,7 @@ class BillmateOrder extends Helper
      */
     public function getAvailableMethods()
     {
-        $bmConnection = $this->config_helper->getBillmateConnection();
-        if ($bmConnection) {
-            $result = $bmConnection->getAccountinfo(array('time' => time()));
-            $mapCodeToMethod = $this->getPaymentMethodsMap();
-            $paymentOptions = array();
-
-            $logfile   = _PS_CACHE_DIR_.'Billmate.log';
-            file_put_contents($logfile, print_r($result['paymentoptions'],true),FILE_APPEND);
-
-            foreach ($result['paymentoptions'] as $option) {
-                /**
-                 * When invoice is unavailable and invoice service is available, use invoice service as invoice
-                 */
-                if ($option['method'] == '2' && !isset($paymentOptions['1'])) {
-                    $mapCodeToMethod['2'] = 'invoice';
-                }
-
-                if (isset($mapCodeToMethod[$option['method']]) && !in_array($mapCodeToMethod[$option['method']], $paymentOptions)) {
-                    $paymentOptions[$option['method']] = $mapCodeToMethod[$option['method']];
-                } else {
-                    continue;
-                }
-            }
-            // Add checkout as payment option if available
-            if (isset($result['checkout']) && $result['checkout']) {
-                $paymentOptions['checkout'] = 'checkout';
-            }
-
-            /**
-             * @param int 1|2 The mehtod that will be used in addPayment request when customer pay with invoice
-             * Method 1 = Invoice , 2 = Invoice service
-             * Is affected by available payment methods in result from getaccountinfo
-             * - Default method 1
-             * - Invoice available, use method 1
-             * - Invoice and invoiceservice available, use method 1
-             * - Invoice service availavble and invoice unavailable, use method 2
-             */
-            $invoiceMethod = (!isset($paymentOptions[1]) && isset($paymentOptions[2])) ? 2 : 1;
-            Configuration::updateValue('BINVOICESERVICE_METHOD', $invoiceMethod);
-
-            return $paymentOptions;
-        } else {
-            return array();
-        }
+        return $this->configHelper->getAvailableMethods();
     }
 
     /**
@@ -255,13 +201,5 @@ class BillmateOrder extends Helper
     public function getOrder($orderId)
     {
         return new Order($orderId);
-    }
-
-    /**
-     * @return array
-     */
-    public function getPaymentMethodsMap()
-    {
-        return $this->mapPaymentMethods;
     }
 }
