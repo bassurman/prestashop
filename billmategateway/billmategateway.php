@@ -83,6 +83,9 @@ class BillmateGateway extends PaymentModule
         $this->l('Discount');
     }
 
+    /**
+     * @return string
+     */
     public function getContent()
     {
         $html = '';
@@ -102,6 +105,9 @@ class BillmateGateway extends PaymentModule
         return $html;
     }
 
+    /**
+     * @return string
+     */
     public function displayAdminTemplate()
     {
         $tab   = array();
@@ -453,7 +459,6 @@ class BillmateGateway extends PaymentModule
         }
         $cost = (1+($params['product']->tax_rate/100))*$params['product']->base_price;
 
-        require_once(_PS_MODULE_DIR_.'/billmategateway/methods/Partpay.php');
         $partpay = new BillmateMethodPartpay();
         $plan = $partpay->getCheapestPlan($cost);
         if (    is_array($plan)
@@ -582,11 +587,14 @@ class BillmateGateway extends PaymentModule
         $order = $params['order'];
         $productList = $params['productList'];
         $testMode      = (boolean) $this->billmateOrder->getMethodInfo($order->module, 'testMode');
-
+        $paymentStatuses = array(
+            'Cancelled',
+            'Created'
+        );
         $billmate = Common::getBillmate($this->billmate_merchant_id,$this->billmate_secret,$testMode);
         $payment = OrderPayment::getByOrderId($order->id);
         $paymentFromBillmate = $billmate->getPaymentinfo(array('number' => $payment[0]->transaction_id));
-        if($paymentFromBillmate['PaymentData']['status'] != 'Created' && $paymentFromBillmate['PaymentData']['status'] != 'Cancelled') {
+        if (!in_array($paymentFromBillmate['PaymentData']['status'], $paymentStatuses)) {
 
             $values['PaymentData']['number'] = $payment[0]->transaction_id;
             $values['PaymentData']['partcredit'] = true;
@@ -792,26 +800,24 @@ class BillmateGateway extends PaymentModule
     {
         $data = array();
 
-        $methodFiles = new FilesystemIterator(_PS_MODULE_DIR_.'/billmategateway/methods', FilesystemIterator::SKIP_DOTS);
         $paymentMethodsAvailable = $this->getAvailableMethods();
+        $paymentsMethods = $this->configHelper->getPaymentModules();
 
-        foreach ($methodFiles as $file) {
-            $class = $file->getBasename('.php');
-            if ($class == 'index') {
+        foreach ($paymentsMethods as $paymentName => $className) {
+            if(!class_exists($className)) {
+                continue;
+            }
+            $method = new $className();
+            if (!in_array(strtolower($method->remote_name),$paymentMethodsAvailable)) {
                 continue;
             }
 
-            if(!in_array(strtolower($class),$paymentMethodsAvailable))
-                continue;
-
-            include_once($file->getPathname());
-
-            $class = "BillmateMethod".$class;
-            $method = new $class();
             $result = $method->getPaymentInfo($cart);
 
-            if (!$result)
+            if (!$result) {
                 continue;
+            }
+
             $newOption = new PrestaShop\PrestaShop\Core\Payment\PaymentOption();
             try{
                 $this->smarty->assign($result);
@@ -842,48 +848,32 @@ class BillmateGateway extends PaymentModule
 
     public function getMethodSettings()
     {
-        $data = array();
+        $settingsData = array();
 
-        $methodFiles = new FilesystemIterator(_PS_MODULE_DIR_.'billmategateway/methods', FilesystemIterator::SKIP_DOTS);
         $paymentMethodsAvailable = $this->getAvailableMethods();
+        $paymentsMethods = $this->configHelper->getPaymentModules();
 
-        /** Sort payment modules on the order of $paymentMethodsAvailable */
-        $methodFilesData = array();
-        foreach ($methodFiles AS $file) {
-            $class = $file->getBasename('.php');
-            if ($class != 'index' AND in_array(strtolower($class),$paymentMethodsAvailable)) {
-                $methodFilesData[strtolower($class)] = array(
-                    'basename'  => $file->getBasename(),
-                    'class'     => $class,
-                    'pathname'  => $file->getPathname()
-                );
+        foreach ($paymentsMethods as $paymentName => $className) {
+            if(!class_exists($className)) {
+                continue;
             }
-        }
 
-        $_methodFilesData = array();
-        foreach ($paymentMethodsAvailable AS $key => $class) {
-            if (isset($methodFilesData[$class])) {
-                $_methodFilesData[$key] = $methodFilesData[$class];
+            $method = new $className();
+            if (!in_array(strtolower($method->remote_name),$paymentMethodsAvailable)) {
+                continue;
             }
-        }
-        $methodFilesData = $_methodFilesData;
 
-        foreach ($methodFilesData AS $file) {
-            $class = 'BillmateMethod'.$file['class'];
-            require_once($file['pathname']);
-
-            $method = new $class();
             $result = $method->getSettings();
             if (!$result) {
                 continue;
             }
 
             $this->smarty->assign(array('settings' => $result, 'moduleName' => $method->displayName));
-            $data[$method->name]['content'] = $this->display(__FILE__, 'settings.tpl');
-            $data[$method->name]['title']   = $method->displayName;
+            $settingsData[$method->name]['content'] = $this->display(__FILE__, 'settings.tpl');
+            $settingsData[$method->name]['title']   = $method->displayName;
         }
 
-        return $data;
+        return $settingsData;
     }
 
     public function getGeneralSettings()
@@ -915,7 +905,6 @@ class BillmateGateway extends PaymentModule
     {
         return $this->hookOrderConfirmation($params);
     }
-
 
     public function hookOrderConfirmation($params)
     {

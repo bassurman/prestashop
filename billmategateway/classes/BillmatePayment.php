@@ -26,10 +26,11 @@ class BillmatePayment
         $paymentsMethods = $this->configHelper->getPaymentModules();
         foreach ($paymentsMethods as $paymentName => $className) {
 
-            $method = new $className();
             if(!class_exists($className)) {
                 continue;
             }
+
+            $method = new $className();
 
             if (!in_array(strtolower($method->remote_name),$paymentMethodsAvailable)) {
                 continue;

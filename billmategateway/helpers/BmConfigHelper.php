@@ -29,7 +29,7 @@ class BmConfigHelper extends Helper
         'billmatecardpay' => 'BillmateMethodCardpay',
         'billmatecheckout' => 'BillmateMethodCheckout' ,
         'billmateinvoice' => 'BillmateMethodInvoice',
-       // 'billmateinvoiceservice' => 'BillmateMethodInvoice',
+        'billmateinvoiceservice' => 'BillmateMethodInvoiceService',
         'billmatepartpay' => 'BillmateMethodPartpay'
     );
 
