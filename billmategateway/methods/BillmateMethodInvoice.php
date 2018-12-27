@@ -19,6 +19,7 @@ class BillmateMethodInvoice extends BillmateGateway {
 		{
 			parent::__construct();
 			$this->name                 = 'billmateinvoice';
+            $this->remote_name                 = 'invoice';
             $this->module = new BillmateGateway();
 			$this->displayName          = $this->module->l('Billmate Invoice','invoice');
 			$this->testMode             = Configuration::get('BINVOICE_MOD');

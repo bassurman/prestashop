@@ -3,10 +3,17 @@ class BillmateOrder extends Helper
 {
     const SALE_METHOD_INFO = 'sale';
 
+    const API_ERROR_CODE = 5220;
+
     /**
      * @var Context
      */
     public $context;
+
+    /**
+     * @var null
+     */
+    protected $activeMethod;
 
     /**
      * @var array
@@ -16,6 +23,17 @@ class BillmateOrder extends Helper
         'factoring',
         'partpayment',
         'handling'
+    );
+
+    /**
+     * @var array
+     */
+    protected $mapPaymentMethods = array(
+        1 => 'invoice',
+        2 => 'invoiceservice',
+        4 => 'partpay',
+        8 => 'cardpay',
+        16 => 'bankpay'
     );
 
     public function __construct()
@@ -50,7 +68,7 @@ class BillmateOrder extends Helper
                 $testMode = $this->getMethodInfo($order->module, 'testMode', false);
                 $bmConnection = $this->config_helper->getBillmateConnection($testMode);
                 $paymentInfo   = $bmConnection->getPaymentinfo(array('number' => $transactionId));
-                
+
                 if (in_array($idStatus, $orderStatuses) && $methodInfo != self::SALE_METHOD_INFO) {
                     $paymentStatus = Tools::strtolower($paymentInfo['PaymentData']['status']);
                     if ($paymentStatus == 'created') {
@@ -61,14 +79,41 @@ class BillmateOrder extends Helper
                         if ($diff < 1) {
                             $result = $bmConnection->activatePayment(array('PaymentData' => array('number' => $transactionId)));
                             if (isset($result['code'])) {
-                                (isset($result['message'])) ? utf8_encode(utf8_decode($result['message'])) : utf8_encode($result);
-                                $this->context->cookie->error_orders = isset($this->context->cookie->error_orders) ? $this->context->cookie->error_orders . ', ' . $order_id : $order_id;
+                                if (isset($result['message'])) {
+                                    $errorMessage = utf8_encode(utf8_decode($result['message']));
+                                } else {
+                                    $errorMessage = utf8_encode($result);
+                                }
+
+                                if (isset($this->context->cookie->error_orders)) {
+                                    $errorMessageOrders = $this->context->cookie->error_orders . ', ' . $order_id;
+                                } else {
+                                    $errorMessageOrders = $order_id;
+                                }
+                                $this->context->cookie->error = $errorMessage;
+                                $this->context->cookie->error_orders = $errorMessageOrders;
                             } else {
-                                $this->context->cookie->confirmation        = !isset($this->context->cookie->confirmation_orders) ? sprintf($this->l('Order %s has been activated through Billmate.'), $order_id) . ' (<a target="_blank" href="http://online.billmate.se/faktura">' . $this->l('Open Billmate Online') . '</>)' : sprintf($this->l('The following orders has been activated through Billmate: %s'), $this->context->cookie->confirmation_orders . ', ' . $order_id) . ' (<a target="_blank" href="http://online.billmate.se">' . $this->l('Open Billmate Online') . '</a>)';
-                                $this->context->cookie->confirmation_orders = isset($this->context->cookie->confirmation_orders) ? $this->context->cookie->confirmation_orders . ', ' . $order_id : $order_id;
+                                if(!isset($this->context->cookie->confirmation_orders)) {
+                                    $confirmationMessage = sprintf($this->l('Order %s has been activated through Billmate.'), $order_id).
+                                        ' (<a target="_blank" href="http://online.billmate.se/faktura">' . $this->l('Open Billmate Online') . '</a>)';
+                                } else {
+                                    $confirmationMessage = sprintf(
+                                        $this->l('The following orders has been activated through Billmate: %s'),
+                                        $this->context->cookie->confirmation_orders . ', ' . $order_id) .
+                                        ' (<a target="_blank" href="http://online.billmate.se">' . $this->l('Open Billmate Online') . '</a>)';
+                                }
+
+                                if (isset($this->context->cookie->confirmation_orders)) {
+                                    $confirmationMessageOrders = $this->context->cookie->confirmation_orders . ', ' . $order_id;
+                                } else {
+                                    $confirmationMessageOrders = $order_id;
+                                }
+
+                                $this->context->cookie->confirmation = $confirmationMessage;
+                                $this->context->cookie->confirmation_orders = $confirmationMessageOrders;
                             }
                         } elseif (isset($paymentInfo['code'])) {
-                            if ($paymentInfo['code'] == 5220) {
+                            if ($paymentInfo['code'] == self::API_ERROR_CODE) {
                                 $mode = $testMode ? 'test' : 'live';
                                 $this->context->cookie->api_error = !isset($this->context->cookie->api_error_orders) ? sprintf($this->l('Order %s failed to activate through Billmate. The order does not exist in Billmate Online. The order exists in (%s) mode however. Try changing the mode in the modules settings.'), $order_id, $mode) . ' (<a target="_blank" href="http://online.billmate.se">' . $this->l('Open Billmate Online') . '</a>)' : sprintf($this->l('The following orders failed to activate through Billmate: %s. The orders does not exist in Billmate Online. The orders exists in (%s) mode however. Try changing the mode in the modules settings.'), $this->context->cookie->api_error_orders, '. ' . $order_id, $mode) . ' (<a target="_blank" href="http://online.billmate.se">' . $this->l('Open Billmate Online') . '</a>)';
                             } else {
@@ -103,7 +148,7 @@ class BillmateOrder extends Helper
                             $this->context->cookie->error_credit  = !isset($this->context->cookie->credit_orders) ? sprintf($this->l('Order %s failed to credit through Billmate.'), $order_id) . ' (<a target="_blank" href="http://online.billmate.se">' . $this->l('Open Billmate Online') . '</a>)' : sprintf($this->l('The following orders failed to credit through Billmate: %s.'), $this->context->cookie->credit_orders . ', ' . $order_id) . ' (<a target="_blank" href="http://online.billmate.se">' . $this->l('Open Billmate Online') . '</a>)';
                             $this->context->cookie->credit_orders = isset($this->context->cookie->credit_orders) ? $this->context->cookie->credit_orders . ', ' . $order_id : $order_id;
                         } else {
-                            $this->context->cookie->credit_confirmation        = !isset($this->context->cookie->credit_confirmation_orders) ? sprintf($this->l('Order %s has been credited through Billmate.'), $order_id) . ' (<a target="_blank" href="http://online.billmate.se/faktura">' . $this->l('Open Billmate Online') . '</>)' : sprintf($this->l('The following orders has been credited through Billmate: %s'), $this->context->cookie->credit_confirmation_orders . ', ' . $order_id) . ' (<a target="_blank" href="http://online.billmate.se">' . $this->l('Open Billmate Online') . '</a>)';
+                            $this->context->cookie->credit_confirmation = !isset($this->context->cookie->credit_confirmation_orders) ? sprintf($this->l('Order %s has been credited through Billmate.'), $order_id) . ' (<a target="_blank" href="http://online.billmate.se/faktura">' . $this->l('Open Billmate Online') . '</>)' : sprintf($this->l('The following orders has been credited through Billmate: %s'), $this->context->cookie->credit_confirmation_orders . ', ' . $order_id) . ' (<a target="_blank" href="http://online.billmate.se">' . $this->l('Open Billmate Online') . '</a>)';
                             $this->context->cookie->credit_confirmation_orders = isset($this->context->cookie->credit_confirmation_orders) ? $this->context->cookie->credit_confirmation_orders . ', ' . $order_id : $order_id;
                         }
                     }
@@ -112,55 +157,51 @@ class BillmateOrder extends Helper
         }
     }
 
-    protected function runActivateProcess($order, $paymentInfo)
-    {
-        $paymentStatus = Tools::strtolower($paymentInfo['PaymentData']['status']);
-        $allowed_payment_statuses = $this->getPaymentStatuses();
-        $testMode = $this->getMethodInfo($order->module, 'testMode', false);
-        $bmConnection = $this->config_helper->getBillmateConnection($testMode);
-        $order_id = $order->id;
-        $payment = OrderPayment::getByOrderId($order_id);
-        $transactionId = $payment[0]->transaction_id;
-    }
-
+    /**
+     * @param      $name
+     * @param      $key
+     * @param bool $checkIfAvailable
+     *
+     * @return bool|
+     */
     public function getMethodInfo($name, $key, $checkIfAvailable = true)
     {
-        $payments_methods = $this->config_helper->getPaymentModules();
-        if(isset($payments_methods[$name])) {
-            $method_class = $payments_methods[$name];
-            if ($checkIfAvailable) {
-                $paymentMethodsAvailable = $this->getAvailableMethods();
-                if(!in_array(strtolower($method_class),$paymentMethodsAvailable)) {
-                    return false;
+        if (is_null($this->activeMethod)) {
+            $payments_methods = $this->config_helper->getPaymentModules();
+            if (isset($payments_methods[$name])) {
+                $methodClass = $payments_methods[$name];
+                $this->activeMethod = new $methodClass();
+
+                if ($checkIfAvailable) {
+                    $paymentMethodsAvailable = $this->getAvailableMethods();
+                    if (!in_array($this->activeMethod->remote_name, $paymentMethodsAvailable)) {
+                        $this->activeMethod = false;
+                    }
                 }
             }
-
-            $method = new $method_class();
-
-            if (property_exists($method, $key)) {
-                return $method->{$key};
-            }
-
         }
-        return false;
+
+        if ($this->activeMethod && property_exists($this->activeMethod, $key)) {
+            return $this->activeMethod->{$key};
+        }
+
+        return $this->activeMethod;
     }
 
+    /**
+     * @return array
+     */
     public function getAvailableMethods()
     {
-        if ($this->billmate_merchant_id && $this->billmate_secret) {
-            $bmConnection = $this->config_helper->getBillmateConnection();
+        $bmConnection = $this->config_helper->getBillmateConnection();
+        if ($bmConnection) {
             $result = $bmConnection->getAccountinfo(array('time' => time()));
-
-            $mapCodeToMethod = array(
-                1 => 'invoice',
-                2 => 'invoiceservice',
-                4 => 'partpay',
-                8 => 'cardpay',
-                16 => 'bankpay'
-            );
+            $mapCodeToMethod = $this->getPaymentMethodsMap();
             $paymentOptions = array();
+
             $logfile   = _PS_CACHE_DIR_.'Billmate.log';
             file_put_contents($logfile, print_r($result['paymentoptions'],true),FILE_APPEND);
+
             foreach ($result['paymentoptions'] as $option) {
                 /**
                  * When invoice is unavailable and invoice service is available, use invoice service as invoice
@@ -169,14 +210,14 @@ class BillmateOrder extends Helper
                     $mapCodeToMethod['2'] = 'invoice';
                 }
 
-                if(isset($mapCodeToMethod[$option['method']]) && !in_array($mapCodeToMethod[$option['method']], $paymentOptions)) {
+                if (isset($mapCodeToMethod[$option['method']]) && !in_array($mapCodeToMethod[$option['method']], $paymentOptions)) {
                     $paymentOptions[$option['method']] = $mapCodeToMethod[$option['method']];
                 } else {
                     continue;
                 }
             }
             // Add checkout as payment option if available
-            if (isset($result['checkout']) AND $result['checkout']) {
+            if (isset($result['checkout']) && $result['checkout']) {
                 $paymentOptions['checkout'] = 'checkout';
             }
 
@@ -214,5 +255,13 @@ class BillmateOrder extends Helper
     public function getOrder($orderId)
     {
         return new Order($orderId);
+    }
+
+    /**
+     * @return array
+     */
+    public function getPaymentMethodsMap()
+    {
+        return $this->mapPaymentMethods;
     }
 }

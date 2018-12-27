@@ -19,6 +19,7 @@ require_once(_PS_MODULE_DIR_.'billmategateway/billmategateway.php');
 		{
 			parent::__construct();
 			$this->name                 = 'billmatepartpay';
+            $this->remote_name                 = 'partpay';
             $this->module = new BillmateGateway();
 			$this->displayName          = $this->module->l('Billmate Part Pay','partpay');
 			$this->testMode             = Configuration::get('BPARTPAY_MOD');

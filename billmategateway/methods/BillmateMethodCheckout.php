@@ -15,6 +15,7 @@ class BillmateMethodCheckout extends BillmateGateway {
     {
         parent::__construct();
         $this->name                     = 'billmatecheckout';
+        $this->remote_name                 = 'checkout';
         $this->module                   = new BillmateGateway();
         $this->displayName              = $this->module->l('Billmate Checkout','cardpay');
         $this->testMode                 = Configuration::get('BILLMATE_CHECKOUT_TESTMODE');

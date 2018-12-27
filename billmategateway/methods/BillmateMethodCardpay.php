@@ -19,6 +19,7 @@ require_once(_PS_MODULE_DIR_.'billmategateway/billmategateway.php');
 		{
 			parent::__construct();
 			$this->name                 = 'billmatecardpay';
+            $this->remote_name                 = 'cardpay';
             $this->module = new BillmateGateway();
 			$this->displayName          = $this->module->l('Billmate Cardpay','cardpay');
 			$this->testMode             = Configuration::get('BCARDPAY_MOD');
