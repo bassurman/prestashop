@@ -74,9 +74,8 @@ class BillmategatewayThankyouModuleFrontController extends BaseBmFront
 	public function getBillmate()
 	{
 		$testMode = Configuration::get('BILLMATE_CHECKOUT_TESTMODE');
-		return $this->configHelper->getBillmateConnection($testMode);
+		return $this->getBillmateConnection($testMode);
 	}
-
 
 	/**
 	 * Make sure order is correct

@@ -40,7 +40,7 @@ class BillmategatewayGetaddressModuleFrontController extends BaseBmFront
             define('BILLMATE_LANGUAGE', $this->context->language->iso_code);
         }
 
-        $billmate = $this->configHelper->getBillmateConnection();
+        $billmate = $this->getBillmateConnection();
         $this->pno = Tools::getValue('pno');
         $this->context->cookie->billmatepno = $this->pno;
 
