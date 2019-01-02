@@ -25,4 +25,3 @@ class Link extends LinkCore
         return $return;
     }
 }
-?>

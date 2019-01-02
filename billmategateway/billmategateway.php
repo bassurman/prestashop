@@ -15,12 +15,25 @@ class BillmateGateway extends PaymentModule
 {
     protected $allowed_currencies;
 
+    /**
+     * @var
+     */
     protected $postValidations;
 
     /**
      * @var array
      */
-    protected $postErrors;
+    protected $postErrors = array();
+
+    /**
+     * @var BmConfigHelper
+     */
+    protected $configHelper;
+
+    /**
+     * @var BillmatePayment
+     */
+    protected $paymentModel;
 
     /**
      * @var BillmateOrder
@@ -56,31 +69,20 @@ class BillmateGateway extends PaymentModule
         $this->page                 = basename(__FILE__, '.php');
         $this->displayName          = $this->l('Billmate Payment Gateway');
         $this->description          = $this->l('Accept online payments with Billmate.');
-        $this->confirmUninstall     = $this->l(
-            'Are you sure you want to delete your settings?'
-        );
+        $this->confirmUninstall     = $this->l('Are you sure you want to delete your settings?');
         $this->billmate_merchant_id = Configuration::get('BILLMATE_ID');
         $this->billmate_secret      = Configuration::get('BILLMATE_SECRET');
         $installedVersion           = Configuration::get('BILLMATE_VERSION');
 
         // Is the module installed and need to be updated?
-        if ($installedVersion && version_compare($installedVersion, $this->version, '<'))
+        if ($installedVersion && version_compare($installedVersion, $this->version, '<')) {
             $this->update();
+        }
 
         $this->context->smarty->assign('base_dir', __PS_BASE_URI__);
         $this->configHelper = new BmConfigHelper();
         $this->paymentModel = new BillmatePayment();
         $this->billmateOrder = new BillmateOrder();
-    }
-
-    public function dummyTranslations()
-    {
-        $this->l('Billmate Cardpay');
-        $this->l('Billmate Bankpay');
-        $this->l('Billmate Invoice');
-        $this->l('Billmate Partpay');
-        $this->l('Discount %s%% VAT');
-        $this->l('Discount');
     }
 
     /**
@@ -92,11 +94,11 @@ class BillmateGateway extends PaymentModule
 
         if (!empty($_POST) && Tools::getIsset('billmateSubmit')) {
             $this->_postValidation();
-            if (isset($this->postValidations) && is_array($this->postValidations) && count($this->postValidations) > 0) {
+            if (isset($this->postValidations) && is_array($this->postValidations) && $this->postValidations) {
                 $html .= $this->displayValidations();
             }
 
-            if (isset($this->postErrors) && is_array($this->postErrors) && count($this->postErrors) > 0) {
+            if (is_array($this->postErrors) && $this->postErrors) {
                 $html .= $this->displayErrors();
             }
         }
@@ -147,127 +149,10 @@ class BillmateGateway extends PaymentModule
      */
     public function _postValidation()
     {
-        $billmateId     = Tools::getValue('billmateId');
-        $billmateSecret = Tools::getValue('billmateSecret');
-
-        $credentialvalidated = false;
-        if ($this->validateCredentials($billmateId, $billmateSecret)) {
-            $credentialvalidated = true;
-            Configuration::updateValue('BILLMATE_ID', $billmateId);
-            Configuration::updateValue('BILLMATE_SECRET', $billmateSecret);
-            $this->billmate_merchant_id = $billmateId;
-            $this->billmate_secret = $billmateSecret;
+        $responseErrors = $this->configHelper->updateConfig();
+        if ($responseErrors) {
+            $this->postErrors = $responseErrors;
         }
-        Configuration::updateValue('BILLMATE_ACTIVATE', Tools::getIsset('activate') ? 1 : 0);
-        Configuration::updateValue('BILLMATE_ACTIVATE_STATUS', serialize(Tools::getValue('activateStatuses')));
-
-        Configuration::updateValue('BILLMATE_CANCEL', Tools::getIsset('credit') ? 1 : 0);
-        Configuration::updateValue('BILLMATE_CANCEL_STATUS', serialize(Tools::getValue('creditStatuses')));
-
-
-        Configuration::updateValue('BILLMATE_MESSAGE', Tools::getIsset('message') ? 1 : 0);
-
-        Configuration::updateValue('BILLMATE_SEND_REFERENCE', Tools::getValue('sendOrderReference'));
-        Configuration::updateValue('BILLMATE_GETADDRESS', Tools::getIsset('getaddress') ? 1 : 0);
-        Configuration::updateValue('BILLMATE_LOGO',Tools::getValue('logo'));
-
-        // Bankpay Settings
-        Configuration::updateValue('BBANKPAY_ENABLED', (Tools::getIsset('bankpayActivated')) ? 1 : 0);
-        Configuration::updateValue('BBANKPAY_MOD', (Tools::getIsset('bankpayTestmode')) ? 1 : 0);
-        //Configuration::updateValue('BBANKPAY_AUTHORIZATION_METHOD', Tools::getValue('bankpayAuthorization'));
-        Configuration::updateValue('BBANKPAY_ORDER_STATUS', Tools::getValue('bankpayBillmateOrderStatus'));
-        Configuration::updateValue('BBANKPAY_MIN_VALUE', Tools::getValue('bankpayBillmateMinimumValue'));
-        Configuration::updateValue('BBANKPAY_MAX_VALUE', Tools::getValue('bankpayBillmateMaximumValue'));
-        Configuration::updateValue('BBANKPAY_SORTORDER', Tools::getValue('bankpayBillmateSortOrder'));
-
-        // Cardpay Settings
-        Configuration::updateValue('BCARDPAY_ENABLED', (Tools::getIsset('cardpayActivated')) ? 1 : 0);
-        Configuration::updateValue('BCARDPAY_MOD', (Tools::getIsset('cardpayTestmode')) ? 1 : 0);
-        Configuration::updateValue('BCARDPAY_ORDER_STATUS', Tools::getValue('cardpayBillmateOrderStatus'));
-        Configuration::updateValue('BCARDPAY_AUTHORIZATION_METHOD', Tools::getValue('cardpayAuthorization'));
-        Configuration::updateValue('BCARDPAY_MIN_VALUE', Tools::getValue('cardpayBillmateMinimumValue'));
-        Configuration::updateValue('BCARDPAY_MAX_VALUE', Tools::getValue('cardpayBillmateMaximumValue'));
-        Configuration::updateValue('BCARDPAY_SORTORDER', Tools::getValue('cardpayBillmateSortOrder'));
-
-        // Invoice Settings
-        Configuration::updateValue('BINVOICE_ENABLED', (Tools::getIsset('invoiceActivated')) ? 1 : 0);
-        Configuration::updateValue('BINVOICE_MOD', (Tools::getIsset('invoiceTestmode')) ? 1 : 0);
-        Configuration::updateValue('BINVOICE_FEE', Tools::getValue('invoiceFee'));
-        Configuration::updateValue('BINVOICE_FEE_TAX', Tools::getValue('invoiceFeeTax'));
-        Configuration::updateValue('BINVOICE_ORDER_STATUS', Tools::getValue('invoiceBillmateOrderStatus'));
-        Configuration::updateValue('BINVOICE_MIN_VALUE', Tools::getValue('invoiceBillmateMinimumValue'));
-        Configuration::updateValue('BINVOICE_MAX_VALUE', Tools::getValue('invoiceBillmateMaximumValue'));
-        Configuration::updateValue('BINVOICE_SORTORDER', Tools::getValue('invoiceBillmateSortOrder'));
-
-        // Invoice Service Settings
-        Configuration::updateValue('BINVOICESERVICE_ENABLED', (Tools::getIsset('invoiceserviceActivated')) ? 1 : 0);
-        Configuration::updateValue('BINVOICESERVICE_MOD', (Tools::getIsset('invoiceserviceTestmode')) ? 1 : 0);
-        Configuration::updateValue('BINVOICESERVICE_FEE', Tools::getValue('invoiceserviceFee'));
-        Configuration::updateValue('BINVOICESERVICE_FEE_TAX', Tools::getValue('invoiceserviceFeeTax'));
-        Configuration::updateValue('BINVOICESERVICE_ORDER_STATUS', Tools::getValue('invoiceserviceBillmateOrderStatus'));
-        Configuration::updateValue('BINVOICESERVICE_MIN_VALUE', Tools::getValue('invoiceserviceBillmateMinimumValue'));
-        Configuration::updateValue('BINVOICESERVICE_MAX_VALUE', Tools::getValue('invoiceserviceBillmateMaximumValue'));
-        Configuration::updateValue('BINVOICESERVICE_SORTORDER', Tools::getValue('invoiceserviceBillmateSortOrder'));
-        Configuration::updateValue('BINVOICESERVICE_FALLBACK',Tools::getIsset('fallbackWhenDifferentAddress') ? 1 : 0);
-
-        // partpay Settings
-        Configuration::updateValue('BPARTPAY_ENABLED', (Tools::getIsset('partpayActivated')) ? 1 : 0);
-        Configuration::updateValue('BPARTPAY_MOD', (Tools::getIsset('partpayTestmode')) ? 1 : 0);
-        Configuration::updateValue('BPARTPAY_ORDER_STATUS', Tools::getValue('partpayBillmateOrderStatus'));
-        Configuration::updateValue('BPARTPAY_MAX_VALUE', Tools::getValue('partpayBillmateMaximumValue'));
-        Configuration::updateValue('BPARTPAY_SORTORDER', Tools::getValue('partpayBillmateSortOrder'));
-
-        /** Min amount for partpayment cant be less than lowest minamount found in pclasses */
-        $partpayBillmateMinimumValue = Tools::getValue('partpayBillmateMinimumValue');
-        $partpayLowestMinAmount = pClasses::getLowestMinAmount();
-        if ($partpayLowestMinAmount >= $partpayBillmateMinimumValue) {
-            $partpayBillmateMinimumValue = floor($partpayLowestMinAmount);
-        }
-        Configuration::updateValue('BPARTPAY_MIN_VALUE', $partpayBillmateMinimumValue);
-
-        /** Checkout settings */
-        Configuration::updateValue('BILLMATE_CHECKOUT_ACTIVATE', Tools::getIsset('billmate_checkout_active') ? 1 : 0);
-        Configuration::updateValue('BILLMATE_CHECKOUT_TESTMODE',Tools::getIsset('billmate_checkout_testmode') ? 1 : 0);
-        Configuration::updateValue('BILLMATE_CHECKOUT_ORDER_STATUS', Tools::getValue('billmate_checkout_order_status'));
-        Configuration::updateValue('BILLMATE_CHECKOUT_PRIVACY_POLICY', Tools::getValue('billmate_checkout_privacy_policy'));
-
-        Configuration::updateValue('BSWISH_ORDER_STATUS', Tools::getValue('swishBillmateOrderStatus'));
-        if (Configuration::get('BPARTPAY_ENABLED') == 1 && $credentialvalidated) {
-            $pclasses  = new pClasses();
-            $languages = Language::getLanguages();
-            foreach ($languages as $language) {
-                $pclasses->Save($this->billmate_merchant_id, $this->billmate_secret, 'se', $language['iso_code'], 'SEK');
-            }
-        }
-    }
-
-    public function validateCredentials($eid, $secret)
-    {
-        if (empty($eid)) {
-            $this->postErrors[] = $this->l('You must insert a Billmate ID');
-            return false;
-        }
-
-        if (empty($secret)) {
-            $this->postErrors[] = $this->l('You must insert a Billmate Secret');
-            return false;
-        }
-
-        $billmate = Common::getBillmate($eid, $secret, false);
-        $data = array();
-        $data['PaymentData'] = array(
-            'currency' => 'SEK',
-            'language' => 'sv',
-            'country'  => 'se'
-        );
-        $result = $billmate->getPaymentplans($data);
-
-        if (isset($result['code']) && ($result['code'] == '9010' || $result['code'] == '9012' || $result['code'] == '9013')) {
-            $this->postErrors[] = utf8_encode($result['message']);
-            return false;
-        }
-
-        return true;
     }
 
     public function displayValidations()
@@ -573,7 +458,7 @@ class BillmateGateway extends PaymentModule
                 if (get_class($this->context->controller) == 'AdminOrdersController') {
                     $this->context->controller->errors[] = $this->context->cookie->{$_property};
                     unset($this->context->cookie->{$_property});
-                    unset($this->context->cookie->{$property_orders.'_orders'});
+                    unset($this->context->cookie->{$property_orders . '_orders'});
                 }
             }
         }
