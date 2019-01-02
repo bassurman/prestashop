@@ -226,4 +226,150 @@ class BillmateOrder extends Helper
     {
         return new Order($orderId);
     }
+
+    public function getSlipUpdateData($order, $transactionId)
+    {
+        $updateData = [];
+        $orderDetailObject = new OrderDetail();
+        $total = 0;
+        $totaltax = 0;
+        $billing_address       = new Address($order->id_address_invoice);
+        $shipping_address      = new Address($order->id_address_delivery);
+        $updateData['PaymentData'] = array(
+            'number' => $transactionId
+        );
+        $updateData['Customer']['nr'] = $order->id_customer;
+        $updateData['Customer']['Billing']  = array(
+            'firstname' => mb_convert_encoding($billing_address->firstname,'UTF-8','auto'),
+            'lastname'  => mb_convert_encoding($billing_address->lastname,'UTF-8','auto'),
+            'company'   => mb_convert_encoding($billing_address->company,'UTF-8','auto'),
+            'street'    => mb_convert_encoding($billing_address->address1,'UTF-8','auto'),
+            'street2'   => '',
+            'zip'       => mb_convert_encoding($billing_address->postcode,'UTF-8','auto'),
+            'city'      => mb_convert_encoding($billing_address->city,'UTF-8','auto'),
+            'country'   => mb_convert_encoding(Country::getIsoById($billing_address->id_country),'UTF-8','auto'),
+            'phone'     => mb_convert_encoding($billing_address->phone,'UTF-8','auto'),
+            'email'     => mb_convert_encoding($this->context->customer->email,'UTF-8','auto')
+        );
+        $updateData['Customer']['Shipping'] = array(
+            'firstname' => mb_convert_encoding($shipping_address->firstname,'UTF-8','auto'),
+            'lastname'  => mb_convert_encoding($shipping_address->lastname,'UTF-8','auto'),
+            'company'   => mb_convert_encoding($shipping_address->company,'UTF-8','auto'),
+            'street'    => mb_convert_encoding($shipping_address->address1,'UTF-8','auto'),
+            'street2'   => '',
+            'zip'       => mb_convert_encoding($shipping_address->postcode,'UTF-8','auto'),
+            'city'      => mb_convert_encoding($shipping_address->city,'UTF-8','auto'),
+            'country'   => mb_convert_encoding(Country::getIsoById($shipping_address->id_country),'UTF-8','auto'),
+            'phone'     => mb_convert_encoding($shipping_address->phone,'UTF-8','auto'),
+        );
+        foreach($orderDetailObject->getList($order->id) as $orderDetail){
+            $calcTax = $this->getCalculatedTaxRate($orderDetail['id_order_detail']);
+
+            $price = $orderDetail['unit_price_tax_excl'];
+            $quantity = $orderDetail['product_quantity'] - $orderDetail['product_quantity_refunded'];
+            $updateData['Articles'][] = array(
+                'artnr' => (string)$orderDetail['product_reference'],
+                'title' => $orderDetail['product_name'],
+                'quantity' => $quantity,
+                'aprice' => round($price * 100),
+                'taxrate' => $calcTax * 100,
+                'discount' => 0,
+                'withouttax' => round(100 * ($price * $quantity))
+            );
+            $total += round(($price * $quantity) * 100);
+            $totaltax += round((100 * ($price * $quantity)) * $calcTax);
+        }
+
+        $taxrate    = $order->carrier_tax_rate;
+        $total_shipping_cost  = round($order->total_shipping_tax_excl,2);
+        $updateData['Cart']['Shipping'] = array(
+            'withouttax' => round($total_shipping_cost * 100),
+            'taxrate'    => $taxrate
+        );
+        $total += round($total_shipping_cost * 100);
+        $totaltax += round(($total_shipping_cost * ($taxrate / 100)) * 100);
+
+        if (Configuration::get('BINVOICE_FEE') > 0 && $order->module == 'billmateinvoice') {
+            $fee           = Configuration::get('BINVOICE_FEE');
+            $invoice_fee_tax = Configuration::get('BINVOICE_FEE_TAX');
+
+            $tax                = new Tax($invoice_fee_tax);
+            $tax_calculator      = new TaxCalculator(array($tax));
+            $tax_rate            = $tax_calculator->getTotalRate();
+            $fee = Tools::convertPriceFull($fee,null,$this->context->currency);
+            $fee = round($fee,2);
+            $updateData['Cart']['Handling'] = array(
+                'withouttax' => $fee * 100,
+                'taxrate'    => $tax_rate
+            );
+
+            $total += $fee * 100;
+            $totaltax += round((($tax_rate / 100) * $fee) * 100);
+        }
+
+        $updateData['Cart']['Total'] = array(
+            'withouttax' => round($total),
+            'tax' => round($totaltax),
+            'rounding' => 0,
+            'withtax' => round($total + $totaltax)
+        );
+
+        return $updateData;
+    }
+
+    /**
+     * @param $order
+     * @param $transactionId
+     * @param $productList
+     *
+     * @return mixed
+     */
+    public function getCreditPaymentData($transactionId, $productList)
+    {
+
+        $creditPaymentData['PaymentData']['number'] = $transactionId;
+        $creditPaymentData['PaymentData']['partcredit'] = true;
+        $creditPaymentData['Articles'] = array();
+        $tax = 0;
+        $total = 0;
+        foreach ($productList as $idOrderDetail => $product) {
+            $orderDetail = Db::getInstance()->getRow('SELECT * FROM `' . _DB_PREFIX_ . 'order_detail` WHERE `id_order_detail` = ' . (int)$idOrderDetail);
+
+            $calcTax = $this->getCalculatedTaxRate($idOrderDetail);
+            $marginTax = $calcTax / (1 + $calcTax);
+            $price = $product['unit_price'] * (1 - $marginTax);
+            $creditPaymentData['Articles'][] = array(
+                'artnr' => (string)$orderDetail['product_reference'],
+                'title' => $orderDetail['product_name'],
+                'quantity' => $product['quantity'],
+                'aprice' => round($price * 100),
+                'taxrate' => $calcTax * 100,
+                'discount' => 0,
+                'withouttax' => round(100 * ($price * $product['quantity']))
+            );
+            $total += round(($price * $product['quantity']) * 100);
+            $tax += round(100 *(($price * $product['quantity']) * $calcTax));
+        }
+        $creditPaymentData['Cart']['Total'] = array(
+            'withouttax' => round($total),
+            'tax' => round($tax),
+            'rounding' => 0,
+            'withtax' => round($total + $tax)
+        );
+        return $creditPaymentData;
+    }
+
+    /**
+     * @param $idOrderDetail
+     *
+     * @return float|int
+     */
+    protected function getCalculatedTaxRate($idOrderDetail)
+    {
+        $taxCalculator = OrderDetailCore::getTaxCalculatorStatic($idOrderDetail);
+        $rate = $taxCalculator->getTotalRate();
+        $calculatedRate = $rate / 100;
+
+        return $calculatedRate;
+    }
 }

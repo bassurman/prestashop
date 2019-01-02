@@ -470,163 +470,51 @@ class BillmateGateway extends PaymentModule
     public function hookActionOrderSlipAdd($params)
     {
         $order = $params['order'];
-        $productList = $params['productList'];
         $testMode      = (boolean) $this->billmateOrder->getMethodInfo($order->module, 'testMode');
         $paymentStatuses = array(
             'Cancelled',
             'Created'
         );
-        $billmate = Common::getBillmate($this->billmate_merchant_id,$this->billmate_secret,$testMode);
+        $billmate = $this->configHelper->getBillmateConnection($testMode);
         $payment = OrderPayment::getByOrderId($order->id);
-        $paymentFromBillmate = $billmate->getPaymentinfo(array('number' => $payment[0]->transaction_id));
+        $transactionId = $payment[0]->transaction_id;
+        $paymentFromBillmate = $billmate->getPaymentinfo(array('number' => $transactionId));
         if (!in_array($paymentFromBillmate['PaymentData']['status'], $paymentStatuses)) {
-
-            $values['PaymentData']['number'] = $payment[0]->transaction_id;
-            $values['PaymentData']['partcredit'] = true;
-            $values['Articles'] = array();
-            $tax = 0;
-            $total = 0;
-            foreach ($productList as $key => $product) {
-
-                $orderDetail = Db::getInstance()->getRow('SELECT * FROM `' . _DB_PREFIX_ . 'order_detail` WHERE `id_order_detail` = ' . (int)$key);
-                $orderDetailTax = Db::getInstance()->getRow('SELECT id_tax FROM `' . _DB_PREFIX_ . 'order_detail_tax` WHERE `id_order_detail` = ' . (int)$key);
-                $taxData = Db::getInstance()->getRow('SELECT rate FROM `' . _DB_PREFIX_ . 'tax` WHERE id_tax = ' . $orderDetailTax['id_tax']);
-
-                $taxRate = $taxData['rate'];
-                $calcTax = $taxRate / 100;
-
-                $marginTax = $calcTax / (1 + $calcTax);
-                $price = $product['unit_price'] * (1 - $marginTax);
-                $values['Articles'][] = array(
-                        'artnr' => (string)$orderDetail['product_reference'],
-                        'title' => $orderDetail['product_name'],
-                        'quantity' => $product['quantity'],
-                        'aprice' => round($price * 100),
-                        'taxrate' => $taxRate,
-                        'discount' => 0,
-                        'withouttax' => round(100 * ($price * $product['quantity']))
-                );
-                $total += round(($price * $product['quantity']) * 100);
-                $tax += round(100 *(($price * $product['quantity']) * $calcTax));
-            }
-            $values['Cart']['Total'] = array(
-                    'withouttax' => round($total),
-                    'tax' => round($tax),
-                    'rounding' => 0,
-                    'withtax' => round($total + $tax)
-            );
-            $result = $billmate->creditPayment($values);
-            if (isset($result['code'])) {
-                $this->context->cookie->api_error = $result['message'];
-                $this->context->cookie->api_error_orders = isset($this->context->cookie->api_error_orders) ? $this->context->cookie->api_error_orders . ', ' . $order->id : $order->id;
-            }
+            $creditPaymentData = $this->billmateOrder->getCreditPaymentData($transactionId, $params['productList']);
+            $result = $billmate->creditPayment($creditPaymentData);
         } else {
-            $orderDetailObject = new OrderDetail();
-            $total = 0;
-            $totaltax = 0;
-            $billing_address       = new Address($order->id_address_invoice);
-            $shipping_address      = new Address($order->id_address_delivery);
-            $values['PaymentData'] = array(
-                'number' => $payment[0]->transaction_id
-            );
-            $values['Customer']['nr'] = $order->id_customer;
-            $values['Customer']['Billing']  = array(
-                    'firstname' => mb_convert_encoding($billing_address->firstname,'UTF-8','auto'),
-                    'lastname'  => mb_convert_encoding($billing_address->lastname,'UTF-8','auto'),
-                    'company'   => mb_convert_encoding($billing_address->company,'UTF-8','auto'),
-                    'street'    => mb_convert_encoding($billing_address->address1,'UTF-8','auto'),
-                    'street2'   => '',
-                    'zip'       => mb_convert_encoding($billing_address->postcode,'UTF-8','auto'),
-                    'city'      => mb_convert_encoding($billing_address->city,'UTF-8','auto'),
-                    'country'   => mb_convert_encoding(Country::getIsoById($billing_address->id_country),'UTF-8','auto'),
-                    'phone'     => mb_convert_encoding($billing_address->phone,'UTF-8','auto'),
-                    'email'     => mb_convert_encoding($this->context->customer->email,'UTF-8','auto')
-            );
-            $values['Customer']['Shipping'] = array(
-                    'firstname' => mb_convert_encoding($shipping_address->firstname,'UTF-8','auto'),
-                    'lastname'  => mb_convert_encoding($shipping_address->lastname,'UTF-8','auto'),
-                    'company'   => mb_convert_encoding($shipping_address->company,'UTF-8','auto'),
-                    'street'    => mb_convert_encoding($shipping_address->address1,'UTF-8','auto'),
-                    'street2'   => '',
-                    'zip'       => mb_convert_encoding($shipping_address->postcode,'UTF-8','auto'),
-                    'city'      => mb_convert_encoding($shipping_address->city,'UTF-8','auto'),
-                    'country'   => mb_convert_encoding(Country::getIsoById($shipping_address->id_country),'UTF-8','auto'),
-                    'phone'     => mb_convert_encoding($shipping_address->phone,'UTF-8','auto'),
-            );
-            foreach($orderDetailObject->getList($order->id) as $orderDetail){
-                $orderDetailTax = Db::getInstance()->getRow('SELECT id_tax FROM `' . _DB_PREFIX_ . 'order_detail_tax` WHERE `id_order_detail` = ' . (int)$orderDetail['id_order_detail']);
-
-                $tax = Db::getInstance()->getRow('SELECT rate FROM `' . _DB_PREFIX_ . 'tax` WHERE id_tax = ' . $orderDetailTax['id_tax']);
-                $taxRate = $tax['rate'];
-                $calcTax = $taxRate / 100;
-
-                $price = $orderDetail['unit_price_tax_excl'];
-                $quantity = $orderDetail['product_quantity'] - $orderDetail['product_quantity_refunded'];
-                $values['Articles'][] = array(
-                        'artnr' => (string)$orderDetail['product_reference'],
-                        'title' => $orderDetail['product_name'],
-                        'quantity' => $quantity,
-                        'aprice' => round($price * 100),
-                        'taxrate' => $taxRate,
-                        'discount' => 0,
-                        'withouttax' => round(100 * ($price * $quantity))
-                );
-                $total += round(($price * $quantity) * 100);
-                $totaltax += round((100 * ($price * $quantity)) * $calcTax);
-            }
-
-            $taxrate    = $order->carrier_tax_rate;
-            $total_shipping_cost  = round($order->total_shipping_tax_excl,2);
-            $values['Cart']['Shipping'] = array(
-                    'withouttax' => round($total_shipping_cost * 100),
-                    'taxrate'    => $taxrate
-            );
-            $total += round($total_shipping_cost * 100);
-            $totaltax += round(($total_shipping_cost * ($taxrate / 100)) * 100);
-
-            if (Configuration::get('BINVOICE_FEE') > 0 && $order->module == 'billmateinvoice') {
-                $fee           = Configuration::get('BINVOICE_FEE');
-                $invoice_fee_tax = Configuration::get('BINVOICE_FEE_TAX');
-
-                $tax                = new Tax($invoice_fee_tax);
-                $tax_calculator      = new TaxCalculator(array($tax));
-                $tax_rate            = $tax_calculator->getTotalRate();
-                $fee = Tools::convertPriceFull($fee,null,$this->context->currency);
-                $fee = round($fee,2);
-                $values['Cart']['Handling'] = array(
-                        'withouttax' => $fee * 100,
-                        'taxrate'    => $tax_rate
-                );
-
-                $total += $fee * 100;
-                $totaltax += round((($tax_rate / 100) * $fee) * 100);
-            }
-
-            $values['Cart']['Total'] = array(
-                    'withouttax' => round($total),
-                    'tax' => round($totaltax),
-                    'rounding' => 0,
-                    'withtax' => round($total + $totaltax)
-            );
-            $result = $billmate->updatePayment($values);
-            if (isset($result['code'])) {
-                $this->context->cookie->api_error = $result['message'];
-                $this->context->cookie->api_error_orders = isset($this->context->cookie->api_error_orders) ? $this->context->cookie->api_error_orders . ', ' . $order->id : $order->id;
-
-            }
+            $updateData = $this->billmateOrder->getSlipUpdateData($order, $transactionId);
+            $result = $billmate->updatePayment($updateData);
+        }
+        if (isset($result['code'])) {
+            $this->context->cookie->api_error = $result['message'];
+            $this->context->cookie->api_error_orders = isset($this->context->cookie->api_error_orders) ? $this->context->cookie->api_error_orders . ', ' . $order->id : $order->id;
         }
     }
 
+    /**
+     * @param $params
+     */
     public function hookActionOrderStatusUpdate($params)
     {
         $this->billmateOrder->updateStatusProcess($params);
     }
 
+    /**
+     * @param $params
+     *
+     * @return string
+     */
     public function hookDisplayPayment($params)
     {
         return $this->hookPayment($params);
     }
 
+    /**
+     * @param $params
+     *
+     * @return string
+     */
     public function hookPayment($params)
     {
         $methods = $this->paymentModel->getActiveMethods();
@@ -657,6 +545,11 @@ class BillmateGateway extends PaymentModule
 
     }
 
+    /**
+     * @param $params
+     *
+     * @return array
+     */
     public function hookPaymentOptions($params)
     {
         $methods = $this->getMethodOptions($params['cart']);
