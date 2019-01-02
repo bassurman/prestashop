@@ -1,36 +1,45 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: Boxedsolutions
- * Date: 2017-08-01
- * Time: 08:51
- */
 
-class BillmategatewayThankyouModuleFrontController extends ModuleFrontController{
+class BillmategatewayThankyouModuleFrontController extends BaseBmFront
+{
 
+    /**
+     * @var bool
+     */
 	public $display_column_left = true;
+
+    /**
+     * @var bool
+     */
 	public $display_column_right = false;
+
+    /**
+     * @var bool
+     */
 	public $ssl = true;
+
+    /**
+     * @var null
+     */
 	public $thankyou_content = null;
 
 	public function initContent()
 	{
 		parent::initContent();
 
-		$billmate_url = $this->getThankyou();
+		$billmateUrl = $this->getSuccessUrl();
 
 		$order_id = $this->thankyou_content['PaymentData']['orderid'];
 		$order_id = explode('-',$order_id);
 		$result = $this->verifyOrder($order_id[0]);
 
 		$this->context->smarty->assign(array(
-			'billmate_thankyou' => $billmate_url,
+			'billmate_thankyou' => $billmateUrl,
 			'HOOK_HEADER' => Hook::exec('displayHeader'),
 			'order_conf' => $this->displayOrderConfirmation((int) ($result['id_order'])),
 		));
-		if(version_compare(_PS_VERSION_,'1.7','>=')){
+		if (version_compare(_PS_VERSION_,'1.7','>=')) {
 			$this->setTemplate('module:billmategateway/views/templates/front/checkout/billmate_thankyou17.tpl');
-
 		} else {
 			$this->setTemplate('checkout/billmate_thankyou.tpl');
 		}
@@ -48,7 +57,10 @@ class BillmategatewayThankyouModuleFrontController extends ModuleFrontController
 		return $result;
 	}
 
-	public function getThankyou()
+    /**
+     * @return string
+     */
+	public function getSuccessUrl()
 	{
 		$billmate = $this->getBillmate();
 		$result = $billmate->getCheckout(array('PaymentData' => array('hash' => Tools::getValue('billmate_hash', 0))));
@@ -56,12 +68,13 @@ class BillmategatewayThankyouModuleFrontController extends ModuleFrontController
 		return $result['PaymentData']['url'];
 	}
 
+    /**
+     * @return BillMate
+     */
 	public function getBillmate()
 	{
-		$eid    = Configuration::get('BILLMATE_ID');
-		$secret = Configuration::get('BILLMATE_SECRET');
 		$testMode = Configuration::get('BILLMATE_CHECKOUT_TESTMODE');
-		return Common::getBillmate($eid,$secret,$testMode);
+		return $this->configHelper->getBillmateConnection($testMode);
 	}
 
 

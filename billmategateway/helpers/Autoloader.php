@@ -9,6 +9,7 @@ function billmateGatewayAutoloader($class)
         'helpers/',
         'classes/',
         'methods/',
+        'controllers/front/',
     );
 
     foreach ($classDirectories as $dir) {
