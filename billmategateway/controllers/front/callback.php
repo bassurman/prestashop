@@ -40,7 +40,6 @@
 			$secret       = Configuration::get('BILLMATE_SECRET');
 			$ssl          = true;
 			$debug        = false;
-			require_once(_PS_MODULE_DIR_.'billmategateway/methods/'.Tools::ucfirst($this->method).'.php');
 
 			$class        = "BillmateMethod".Tools::ucfirst($this->method);
 			$this->module = new $class;
@@ -98,8 +97,6 @@
 					}
 				}
 
-                $class_file = _PS_MODULE_DIR_.'billmategateway/methods/'.Tools::ucfirst($this->method).'.php';
-                require_once($class_file);
 				$class        = "BillmateMethod".Tools::ucfirst($this->method);
 				$this->module = new $class;
 				$lockfile   = _PS_CACHE_DIR_.$data['orderid'];

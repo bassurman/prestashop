@@ -65,8 +65,6 @@
 			$secret = Configuration::get('BILLMATE_SECRET');
 			$ssl    = true;
 			$debug  = false;
-			require_once(_PS_MODULE_DIR_.'billmategateway/methods/'.Tools::ucfirst($this->method).'.php');
-
 			$class        = "BillmateMethod".Tools::ucfirst($this->method);
 			$this->module = new $class;
 			$this->coremodule = new BillmateGateway();
@@ -92,7 +90,7 @@
 				case 'invoice':
 				case 'partpay':
 				case 'invoiceservice':
-					if(Tools::getIsset('invoice_address') && file_exists(_PS_MODULE_DIR_.'billmategateway/methods/Invoiceservice.php'))
+					if(Tools::getIsset('invoice_address') && class_exists('BillmateMethodInvoiceservice'))
 						$this->invoiceservice = true;
 					if(Tools::getValue('geturl') == 'yes') {
 						$result = $this->checkAddress();

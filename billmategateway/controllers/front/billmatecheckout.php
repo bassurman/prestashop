@@ -388,10 +388,6 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends ModuleFrontCo
         $return = array();
         $billmate = $this->getBillmate();
 
-        require_once(_PS_MODULE_DIR_.'billmategateway/methods/'.Tools::ucfirst($this->method).'.php');
-
-
-
         $class        = "BillmateMethod".Tools::ucfirst($this->method);
         $this->module = new $class;
         switch ($this->method) {

@@ -61,26 +61,26 @@ class BillmatePayment
         $cart = $this->getCart();
         $data = array();
 
-        $methodFiles = new FilesystemIterator(_PS_MODULE_DIR_.'/billmategateway/methods', FilesystemIterator::SKIP_DOTS);
         $paymentMethodsAvailable = $this->getAvailableMethods();
+        $paymentModules = $this->configHelper->getPaymentModules();
+        foreach ($paymentModules as $methodCode => $className) {
 
-        foreach ($methodFiles as $file) {
-            $class = $file->getBasename('.php');
-            if ($class == 'index') {
+            if (!class_exists($className)) {
+                continue;
+            }
+            $method = new $className();
+
+            if(!in_array(strtolower($method->remote_name),$paymentMethodsAvailable)) {
                 continue;
             }
 
-            if(!in_array(strtolower($class),$paymentMethodsAvailable))
-                continue;
 
-            include_once($file->getPathname());
-
-            $class = "BillmateMethod".$class;
-            $method = new $class();
             $result = $method->getPaymentInfo($cart);
 
-            if (!$result)
+            if (!$result) {
                 continue;
+            }
+
             $newOption = new PrestaShop\PrestaShop\Core\Payment\PaymentOption();
             try{
                 $this->smarty->assign($result);

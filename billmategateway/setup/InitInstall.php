@@ -51,7 +51,7 @@
 				$this->db->execute('DELETE FROM '._DB_PREFIX_.'module WHERE name = "billmateinvoice";');
                 $this->db->execute('DELETE FROM '._DB_PREFIX_.'module WHERE name = "billmatecheckout";');
 
-				if(file_exists(_PS_MODULE_DIR_.'/billmategateway/methods/Invoiceservice.php')) {
+				if(file_exists(_PS_MODULE_DIR_.'/billmategateway/methods/BillmateMethodInvoiceservice.php')) {
 					$this->db->execute('DELETE FROM ' . _DB_PREFIX_ . 'module WHERE name = "billmateinvoiceservice";');
 					$this->db->execute('INSERT INTO '._DB_PREFIX_.'module (name,active,version) VALUES("billmateinvoiceservice",1,"2.0.0");');
 				}

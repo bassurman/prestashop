@@ -61,9 +61,6 @@
 			$ssl          = true;
 			$debug        = false;
 
-            $class_file = _PS_MODULE_DIR_.'billmategateway/methods/'.Tools::ucfirst($this->method).'.php';
-			require_once($class_file);
-
 			$class        = "BillmateMethod".Tools::ucfirst($this->method);
 			$this->module = new $class;
 			$this->coremodule = new BillmateGateway();
@@ -117,8 +114,6 @@
 					}
 				}
 
-                $class_file = _PS_MODULE_DIR_.'billmategateway/methods/'.Tools::ucfirst($this->method).'.php';
-                require_once($class_file);
 				$class        = "BillmateMethod".Tools::ucfirst($this->method);
 				$this->module = new $class;
 
@@ -174,8 +169,6 @@
                     if ($paymentInfo['PaymentData']['method'] == '1' OR '2' == $paymentInfo['PaymentData']['method']) {
                         /** Paid with invoice */
                         $this->method = 'invoice';
-                        $class_file = _PS_MODULE_DIR_.'billmategateway/methods/'.Tools::ucfirst($this->method).'.php';
-                        require_once($class_file);
                         $class        = "BillmateMethod".Tools::ucfirst($this->method);
                         $this->module = new $class;
                     }
