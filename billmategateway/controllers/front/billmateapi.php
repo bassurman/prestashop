@@ -48,29 +48,8 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
 
     public function postProcess()
     {
-        if (!defined('BILLMATE_CLIENT')) {
-            $version = defined('_PS_VERSION_') ? _PS_VERSION_ : 'toOld';
-            define('BILLMATE_CLIENT', 'PrestaShop:' .$version. ' PLUGIN:' . BILLMATE_PLUGIN_VERSION);
-        }
-
-        if (!defined('BILLMATE_CLIENT'))
-            define('BILLMATE_CLIENT', 'PrestaShop:'.BILLMATE_PLUGIN_VERSION);
-
-        $this->method = Tools::getValue('method');
-
-        if (!defined('BILLMATE_SERVER')) {
-            if ($this->method == 'cardpay' && version_compare(_PS_VERSION_,'1.7','>='))
-                define('BILLMATE_SERVER', '2.1.9');
-            else
-                define('BILLMATE_SERVER', '2.1.7');
-        }
-
-        $class        = "BillmateMethod".Tools::ucfirst($this->method);
-        $this->module = new $class;
-        $this->coremodule = new BillmateGateway();
-        $testmode = $this->module->testMode;
-
-        $this->billmate = $this->getBillmateConnection($testmode);
+        $this->definePluginConstants();
+        $this->defineProperties();
 
         $this->pno = $this->method == 'invoice' || $this->method == 'partpay'
             ? ((Tools::getIsset('pno_billmateinvoice'))
@@ -85,22 +64,18 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
          */
         $data = array();
 
-        switch ($this->method)
-        {
+        switch ($this->method) {
             case 'invoice':
             case 'partpay':
             case 'invoiceservice':
-                if(Tools::getIsset('invoice_address') && class_exists('BillmateMethodInvoiceservice'))
+                if(Tools::getIsset('invoice_address') && class_exists('BillmateMethodInvoiceservice')) {
                     $this->invoiceservice = true;
-                if(Tools::getValue('geturl') == 'yes') {
-                    $result = $this->checkAddress();
-                    /*
-                    $result = $this->checkAddress();
-                    */
-                    /*if (is_array($result))
-                        die(Tools::jsonEncode($result));*/
-
                 }
+
+                if(Tools::getValue('geturl') == 'yes') {
+                    $this->checkAddress();
+                }
+
                 $data = $this->prepareInvoice($this->method);
                 break;
 
@@ -114,24 +89,23 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
         $data['Customer'] = $this->prepareCustomer();
         $data['Articles'] = $this->prepareArticles();
         $discounts = $this->prepareDiscounts();
-        if (count($discounts) > 0)
-        {
-            foreach ($discounts as $discount)
+        if (count($discounts) > 0) {
+            foreach ($discounts as $discount) {
                 array_push($data['Articles'], $discount);
+            }
         }
 
 
-        $data['Cart']     = $this->prepareTotals();
+        $data['Cart'] = $this->prepareTotals();
 
-        if(Configuration::get('BILLMATE_MESSAGE')) {
+        if (Configuration::get('BILLMATE_MESSAGE')) {
             $message = Message::getMessageByCartId($this->context->cart->id);
 
             if (is_array($message) && isset($message['message'])) {
                 $message['message'] = html_entity_decode($message['message']);
             }
 
-            if(strlen($message['message']) > 0){
-
+            if (strlen($message['message']) > 0) {
                 $data['Articles'][] = array(
                     'quantity'   => 0,
                     'title'      => ' ',
@@ -153,8 +127,6 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
 
                 );
             }
-
-            //$data['PaymentInfo']['projectname'] = $message['message'];
         }
 
         $result = $this->billmate->addPayment($data);
@@ -758,26 +730,26 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
                     $orderId = 0;
                     if ($this->method == 'partpay')
                     {
-                        $this->module->validateOrder((int)$this->context->cart->id,
+                        $this->paymentMethod->validateOrder((int)$this->context->cart->id,
                             $status,
                             ($this->method == 'invoice') ? $this->paid_amount / 100 : $total,
-                            $this->module->displayName,
+                            $this->paymentMethod->displayName,
                             null, $extra, null, false, $customer->secure_key);
-                        $orderId = $this->module->currentOrder;
+                        $orderId = $this->paymentMethod->currentOrder;
                     }
                     else
                     {
-                        $this->module->validateOrder((int)$this->context->cart->id,
+                        $this->paymentMethod->validateOrder((int)$this->context->cart->id,
                             $status,
                             ($this->method == 'invoice' || $this->method == 'invoiceservice') ? $this->paid_amount / 100 : $total,
-                            $this->module->displayName,
+                            $this->paymentMethod->displayName,
                             null, $extra, null, false, $customer->secure_key);
-                        $orderId = $this->module->currentOrder;
+                        $orderId = $this->paymentMethod->currentOrder;
                     }
                     $values                = array();
                     $values['PaymentData'] = array(
                         'number'  => $result['number'],
-                        'orderid' => (Configuration::get('BILLMATE_SEND_REFERENCE') == 'reference') ? $this->module->currentOrderReference : $this->module->currentOrder
+                        'orderid' => (Configuration::get('BILLMATE_SEND_REFERENCE') == 'reference') ? $this->paymentMethod->currentOrderReference : $this->paymentMethod->currentOrder
                     );
 
                     $this->billmate->updatePayment($values);
@@ -838,4 +810,16 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
         return $id2name[$method];
     }
 
+    /**
+     * @return $this
+     */
+    public function definePluginConstants()
+    {
+        if (!defined('BILLMATE_SERVER')) {
+            if ($this->method == 'cardpay' && version_compare(_PS_VERSION_,'1.7','>=')) {
+                define('BILLMATE_SERVER', '2.1.9');
+            }
+        }
+        return $this;
+    }
 }

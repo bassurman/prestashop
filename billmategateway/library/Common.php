@@ -23,8 +23,11 @@
 				$version = defined('_PS_VERSION_') ? _PS_VERSION_ : 'toOld';
 				define('BILLMATE_CLIENT', 'PrestaShop:' .$version. ' PLUGIN:' . BILLMATE_PLUGIN_VERSION);
 			}
-			if(!defined('BILLMATE_SERVER'))
-				define('BILLMATE_SERVER','2.1.7');
+
+			if (!defined('BILLMATE_SERVER')) {
+                define('BILLMATE_SERVER','2.1.7');
+            }
+
 			return new BillMate($eid, $secret, $ssl, $testmode, $debug);
 		}
 

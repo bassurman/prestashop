@@ -38,14 +38,12 @@ class BillmategatewayAcceptModuleFrontController extends BaseBmFront
     private function checkOrder($cart_id)
     {
         $order = Order::getOrderByCartId($cart_id);
-        if (!$order)
-        {
+        if (!$order) {
             sleep(1);
             $this->checkOrder($cart_id);
-        }
-        else
+        } else {
             return $order;
-
+        }
     }
 
     public function getmoduleId($method)
@@ -63,15 +61,7 @@ class BillmategatewayAcceptModuleFrontController extends BaseBmFront
 
     public function postProcess()
     {
-        $this->method = Tools::getValue('method');
-
-        $class        = "BillmateMethod".Tools::ucfirst($this->method);
-        $this->module = new $class;
-        $this->coremodule = new BillmateGateway();
-
-        $testMode = $this->module->testMode;
-
-        $this->billmate = $this->getBillmateConnection($testMode);
+        $this->defineProperties();
 
         $_POST               = !empty($_POST) ? $_POST : $_GET;
         $data               = $this->billmate->verify_hash($_POST);
@@ -90,7 +80,7 @@ class BillmategatewayAcceptModuleFrontController extends BaseBmFront
         }
 
 
-        $displayName = $this->module->displayName;
+        $displayName = $this->paymentMethod->displayName;
         if ($this->method == 'checkout') {
             /** When checkout, check for selected payment method found in $paymentInfo.PaymentData.method_name */
             if (isset($paymentInfo['PaymentData']['method_name']) AND $paymentInfo['PaymentData']['method_name'] != '') {
@@ -102,7 +92,7 @@ class BillmategatewayAcceptModuleFrontController extends BaseBmFront
         if (!isset($data['code']) && !isset($data['error']))
         {
             if (!isset($paymentInfo['code']) AND $this->method != 'checkout') {
-                switch($paymentInfo['PaymentData']['method']){
+                switch($paymentInfo['PaymentData']['method']) {
                     case '4':
                         $this->method = 'partpay';
                         break;
@@ -119,21 +109,20 @@ class BillmategatewayAcceptModuleFrontController extends BaseBmFront
                 }
             }
 
-            $class        = "BillmateMethod".Tools::ucfirst($this->method);
-            $this->module = new $class;
+            $this->paymentMethod = $this->getPaymentMethodClass();
 
             $lockfile   = _PS_CACHE_DIR_.$data['orderid'];
             $processing = file_exists($lockfile);
-            if ($this->context->cart->orderExists() || $processing)
-            {
-                $order_id = 0;
-                if ($processing)
+            if ($this->context->cart->orderExists() || $processing) {
+                if ($processing) {
                     $order_id = $this->checkOrder($this->context->cart->id);
-                else
+                } else {
                     $order_id = Order::getOrderByCartId($this->context->cart->id);
+                }
 
                 $orderObject = new Order($order_id);
-                if($orderObject->current_state == Configuration::get('BILLMATE_PAYMENT_PENDING') && $data['status'] != 'Pending'){
+                if ($orderObject->current_state == Configuration::get('BILLMATE_PAYMENT_PENDING')
+                    && $data['status'] != 'Pending') {
                     $orderHistory = new OrderHistory();
 
                     $status_key = 'B'.strtoupper($this->method).'_ORDER_STATUS';
@@ -148,8 +137,9 @@ class BillmategatewayAcceptModuleFrontController extends BaseBmFront
                     $orderHistory->changeIdOrderState($status,(int) $orderObject->id, true);
                     $orderHistory->add();
                 }
-                if(isset($this->context->cookie->billmatepno))
+                if (isset($this->context->cookie->billmatepno)) {
                     unset($this->context->cookie->billmatepno);
+                }
 
                 if ('' != Common::getCartCheckoutHash()) {
                     $hash = Common::getCartCheckoutHash();
@@ -161,21 +151,17 @@ class BillmategatewayAcceptModuleFrontController extends BaseBmFront
                     Tools::redirectLink($url);
                     die;
                 } else {
-
-
                     Tools::redirectLink(__PS_BASE_URI__ . 'order-confirmation.php?key=' . $customer->secure_key .
                         '&id_cart=' . (int)$this->context->cart->id . '&id_module=' . (int)$this->getmoduleId('billmate' . $this->method) .
                         '&id_order=' . (int)$order_id);
                     die;
                 }
             } else {
-
-
                 if ($paymentInfo['PaymentData']['method'] == '1' OR '2' == $paymentInfo['PaymentData']['method']) {
                     /** Paid with invoice */
                     $this->method = 'invoice';
                     $class        = "BillmateMethod".Tools::ucfirst($this->method);
-                    $this->module = new $class;
+                    $this->paymentMethod = new $class;
                 }
 
 
@@ -202,17 +188,17 @@ class BillmategatewayAcceptModuleFrontController extends BaseBmFront
                     $customer = new Customer((int)$this->context->cart->id_customer);
                     $orderId = 0;
 
-                    $this->module->validateOrder((int)$this->context->cart->id,
+                    $this->paymentMethod->validateOrder((int)$this->context->cart->id,
                         $status,
                         $total,
                         $displayName,
                         null, $extra, null, false, $customer->secure_key);
-                    $orderId = $this->module->currentOrder;
+                    $orderId = $this->paymentMethod->currentOrder;
 
                     $values = array();
                     $values['PaymentData'] = array(
                         'number' => $result['PaymentData']['order']['number'],
-                        'orderid' => (Configuration::get('BILLMATE_SEND_REFERENCE') == 'reference') ? $this->module->currentOrderReference : $this->module->currentOrder
+                        'orderid' => (Configuration::get('BILLMATE_SEND_REFERENCE') == 'reference') ? $this->paymentMethod->currentOrderReference : $this->paymentMethod->currentOrder
                     );
 
                     $billmate->updatePayment($values);
@@ -450,17 +436,17 @@ class BillmategatewayAcceptModuleFrontController extends BaseBmFront
             $status = ($data['status'] == 'Pending') ? Configuration::get('BILLMATE_PAYMENT_PENDING') : $status;
             $total = $paymentInfo['Cart']['Total']['withtax'] / 100;
 
-            $this->module->validateOrder((int)$this->context->cart->id, $status,
+            $this->paymentMethod->validateOrder((int)$this->context->cart->id, $status,
                 $total, $displayName, null, $extra, null, false, $customer->secure_key);
             $values = array();
 
             $values['PaymentData'] = array(
                 'number'  => $data['number'],
-                'orderid' => (Configuration::get('BILLMATE_SEND_REFERENCE') == 'reference') ? $this->module->currentOrderReference : $this->module->currentOrder
+                'orderid' => (Configuration::get('BILLMATE_SEND_REFERENCE') == 'reference') ? $this->paymentMethod->currentOrderReference : $this->paymentMethod->currentOrder
             );
             $this->billmate->updatePayment($values);
 
-            if ($this->module->authorization_method == 'sale' && $this->method == 'cardpay')
+            if ($this->paymentMethod->authorization_method == 'sale' && $this->method == 'cardpay')
             {
 
                 $values['PaymentData'] = array(
@@ -486,7 +472,7 @@ class BillmategatewayAcceptModuleFrontController extends BaseBmFront
 
                 Tools::redirectLink(__PS_BASE_URI__ . 'order-confirmation.php?key=' . $customer->secure_key .
                     '&id_cart=' . (int)$this->context->cart->id . '&id_module=' . (int)$this->getmoduleId('billmate' . $this->method) .
-                    '&id_order=' . (int)$this->module->currentOrder);
+                    '&id_order=' . (int)$this->paymentMethod->currentOrder);
                 die;
             }
 

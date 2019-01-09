@@ -20,6 +20,8 @@
 
 class BaseBmFront extends ModuleFrontControllerCore
 {
+
+    const P_CLASS_PREFIX = 'BillmateMethod';
     /**
      * @var BmConfigHelper
      */
@@ -28,6 +30,7 @@ class BaseBmFront extends ModuleFrontControllerCore
     public function __construct()
     {
         $this->configHelper = new BmConfigHelper();
+        $this->method = Tools::getValue('method');
         parent::__construct();
     }
 
@@ -39,5 +42,26 @@ class BaseBmFront extends ModuleFrontControllerCore
     public function getBillmateConnection($testMode = false)
     {
         return $this->configHelper->getBillmateConnection($testMode);
+    }
+
+    /**
+     * @return BillmateGateway
+     */
+    public function getPaymentMethodClass()
+    {
+        $paymentMethodClassName = self::P_CLASS_PREFIX . Tools::ucfirst($this->method);
+        return new $paymentMethodClassName;
+    }
+
+
+    /**
+     * @return $this
+     */
+    public function defineProperties()
+    {
+        $this->paymentMethod = $this->getPaymentMethodClass();
+        $this->coremodule = new BillmateGateway();
+        $this->billmate = $this->getBillmateConnection($this->paymentMethod->testMode);
+        return $this;
     }
 }
