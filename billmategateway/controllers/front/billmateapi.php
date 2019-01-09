@@ -147,27 +147,27 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
         $shipping_address      = new Address($this->context->cart->id_address_delivery);
 
         $customer['Billing']  = array(
-            'firstname' => mb_convert_encoding($billing_address->firstname,'UTF-8','auto'),
-            'lastname'  => mb_convert_encoding($billing_address->lastname,'UTF-8','auto'),
-            'company'   => mb_convert_encoding($billing_address->company,'UTF-8','auto'),
-            'street'    => mb_convert_encoding($billing_address->address1,'UTF-8','auto'),
-            'street2'   => mb_convert_encoding($billing_address->address2,'UTF-8','auto'),
-            'zip'       => mb_convert_encoding($billing_address->postcode,'UTF-8','auto'),
-            'city'      => mb_convert_encoding($billing_address->city,'UTF-8','auto'),
-            'country'   => mb_convert_encoding(Country::getIsoById($billing_address->id_country),'UTF-8','auto'),
-            'phone'     => mb_convert_encoding($billing_address->phone,'UTF-8','auto'),
-            'email'     => mb_convert_encoding($this->context->customer->email,'UTF-8','auto')
+            'firstname' => $this->convertToUtf($billing_address->firstname),
+            'lastname'  => $this->convertToUtf($billing_address->lastname),
+            'company'   => $this->convertToUtf($billing_address->company),
+            'street'    => $this->convertToUtf($billing_address->address1),
+            'street2'   => $this->convertToUtf($billing_address->address2),
+            'zip'       => $this->convertToUtf($billing_address->postcode),
+            'city'      => $this->convertToUtf($billing_address->city),
+            'country'   => $this->convertToUtf(Country::getIsoById($billing_address->id_country)),
+            'phone'     => $this->convertToUtf($billing_address->phone),
+            'email'     => $this->convertToUtf($this->context->customer->email)
         );
         $customer['Shipping'] = array(
-            'firstname' => mb_convert_encoding($shipping_address->firstname,'UTF-8','auto'),
-            'lastname'  => mb_convert_encoding($shipping_address->lastname,'UTF-8','auto'),
-            'company'   => mb_convert_encoding($shipping_address->company,'UTF-8','auto'),
-            'street'    => mb_convert_encoding($shipping_address->address1,'UTF-8','auto'),
-            'street2'   => mb_convert_encoding($shipping_address->address2,'UTF-8','auto'),
-            'zip'       => mb_convert_encoding($shipping_address->postcode,'UTF-8','auto'),
-            'city'      => mb_convert_encoding($shipping_address->city,'UTF-8','auto'),
-            'country'   => mb_convert_encoding(Country::getIsoById($shipping_address->id_country),'UTF-8','auto'),
-            'phone'     => mb_convert_encoding($shipping_address->phone,'UTF-8','auto'),
+            'firstname' => $this->convertToUtf($shipping_address->firstname),
+            'lastname'  => $this->convertToUtf($shipping_address->lastname),
+            'company'   => $this->convertToUtf($shipping_address->company),
+            'street'    => $this->convertToUtf($shipping_address->address1),
+            'street2'   => $this->convertToUtf($shipping_address->address2),
+            'zip'       => $this->convertToUtf($shipping_address->postcode),
+            'city'      => $this->convertToUtf($shipping_address->city),
+            'country'   => $this->convertToUtf(Country::getIsoById($shipping_address->id_country)),
+            'phone'     => $this->convertToUtf($shipping_address->phone),
         );
 
         return $customer;
@@ -181,10 +181,8 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
     {
         $articles_arr = array();
         $articles    = $this->context->cart->getProducts();
-        foreach ($articles as $article)
-        {
-            $taxrate       = ($article['price_wt'] == $article['price']) ? 0 : $article['rate'];
-
+        foreach ($articles as $article) {
+            $taxrate = ($article['price_wt'] == $article['price']) ? 0 : $article['rate'];
             $roundedArticle = round($article['price'], 2);
             $totalArticle = ($roundedArticle * $article['cart_quantity']) * 100;
             $articles_arr[] = array(
@@ -197,10 +195,11 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
                 'withouttax' => ($roundedArticle * $article['cart_quantity']) * 100
 
             );
-            if (!isset($this->prepare_discount[$taxrate]))
+            if (!isset($this->prepare_discount[$taxrate])) {
                 $this->prepare_discount[$taxrate] = $totalArticle;
-            else
+            } else {
                 $this->prepare_discount[$taxrate] += $totalArticle;
+            }
 
             $this->totals += $totalArticle;
             $this->tax += round($totalArticle * ($taxrate / 100));
@@ -218,19 +217,16 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
         $details = $this->context->cart->getSummaryDetails(null, true);
         $cartRules = $this->context->cart->getCartRules();
         $title = '';
-        if (count($cartRules) > 0)
-        {
-            foreach ($cartRules as $cartRule)
-            {
+        if (count($cartRules) > 0) {
+            foreach ($cartRules as $cartRule) {
                 $title .= $cartRule['name'].' ';
             }
         }
+
         $totalTemp = $this->totals;
         $discounts = array();
-        if (!empty($details['total_discounts']))
-        {
-            foreach ($this->prepare_discount as $key => $value)
-            {
+        if (!empty($details['total_discounts'])) {
+            foreach ($this->prepare_discount as $key => $value) {
 
                 $percent_discount = $value / ($totalTemp);
 
@@ -253,14 +249,12 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
             }
 
         }
-        if (!empty($details['gift_products']))
-        {
-            foreach ($details['gift_products'] as $gift)
-            {
+
+        if (!empty($details['gift_products'])) {
+            foreach ($details['gift_products'] as $gift) {
                 $discount_amount = 0;
                 $taxrate        = 0;
-                foreach ($this->context->cart->getProducts() as $product)
-                {
+                foreach ($this->context->cart->getProducts() as $product) {
                     $taxrate        = ($product['price_wt'] == $product['price']) ? 0 : $product['rate'];
                     $discount_amount = $product['price'];
                 }
@@ -306,8 +300,7 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
             $this->tax          += $shipping['tax'];
         }
 
-        if (Configuration::get('BINVOICE_FEE') > 0 && $this->method == 'invoice')
-        {
+        if (Configuration::get('BINVOICE_FEE') > 0 && $this->method == 'invoice') {
             $fee           = Configuration::get('BINVOICE_FEE');
             $invoice_fee_tax = Configuration::get('BINVOICE_FEE_TAX');
 
@@ -326,8 +319,8 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
             $this->totals += $fee * 100;
             $this->tax += (($tax_rate / 100) * $fee) * 100;
         }
-        if (Configuration::get('BINVOICESERVICE_FEE') > 0 && $this->method == 'invoiceservice')
-        {
+
+        if (Configuration::get('BINVOICESERVICE_FEE') > 0 && $this->method == 'invoiceservice') {
             $fee           = Configuration::get('BINVOICESERVICE_FEE');
             $invoice_fee_tax = Configuration::get('BINVOICESERVICE_FEE_TAX');
 
@@ -362,8 +355,8 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
     /**
      * @return array with withouttax, tax, taxrate
      */
-    public function getCartShipping() {
-
+    public function getCartShipping()
+    {
         $details    = $this->context->cart->getSummaryDetails(null, true);
         $carrier    = $details['carrier'];
         $notfree    = !(isset($details['free_ship']) && $details['free_ship'] == 1);
@@ -425,218 +418,163 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
      */
     public function checkAddress()
     {
-        $address = $this->billmate->getAddress(array('pno' => $this->pno));
-        if (isset($address['code']))
-        {
+        $address = $this->getAddressFromService();
+        if (isset($address['code'])) {
             $return = array('success' => false, 'content' => utf8_encode($address['message']));
             die(Tools::jsonEncode($return));
         }
-        foreach ($address as $key => $value)
-            $address[$key] = mb_convert_encoding($value,'UTF-8','auto');
 
-        $billing  = new Address($this->context->cart->id_address_invoice);
-        $shipping = new Address($this->context->cart->id_address_delivery);
-
-        $user_ship = $shipping->firstname.' '.$shipping->lastname.' '.$shipping->company;
-        $user_bill = $billing->firstname.' '.$billing->lastname.' '.$billing->company;
-
-        $first_arr = explode(' ', $shipping->firstname);
-        $last_arr  = explode(' ', $shipping->lastname);
-        if (empty($address['company']))
-        {
-            $apifirst = explode(' ', $address['firstname']);
-            $apilast = explode(' ', $address['lastname']);
-
-            $matched_first = array_intersect($first_arr, $apifirst);
-            $matched_last = array_intersect($last_arr, $apilast);
-
-            //$api_matched_name = ((count($matched_first) == count($apifirst)) && (count($matched_last) == count($apilast)));
-            $api_matched_name = Common::matchstr($shipping->firstname,$address['lastname']) && Common::matchstr($shipping->lastname,$address['lastname']);
-
+        $address = $this->convertAddress($address);
+        foreach ($address as $key => $value) {
+            $address[$key] = $this->convertToUtf($value);
         }
-        else
-        {
-            $prestacompany = explode(' ', $billing->company);
-            $apicompany = explode(' ', $address['company']);
-            $matched_company = array_intersect($prestacompany, $apicompany);
-            $api_matched_name = !empty($matched_company);
+
+        $isMatched = $this->isAddressMatched($address);
+        if ($isMatched) {
+            return true;
         }
-        $address_same = Common::matchstr($user_ship, $user_bill) &&
-                        Common::matchstr($billing->city, $shipping->city) &&
-                        Common::matchstr($billing->postcode, $shipping->postcode) &&
-                        Common::matchstr($billing->address1, $shipping->address1);
-        if (!(
-            $api_matched_name
-            && Common::matchstr($shipping->address1, $address['street'])
-            && Common::matchstr($shipping->postcode, $address['zip'])
-            && Common::matchstr($shipping->city, $address['city'])
-            && Common::matchstr($address['country'], Country::getIsoById($shipping->id_country))
-            && $address_same
-        ))
-        {
-            if (Tools::getValue('geturl') == 'yes')
-            {
-                // The customer clicked yes
-                $cart_details = $this->context->cart->getSummaryDetails(null, true);
-                $carrier_id   = $this->context->cart->id_carrier;
 
-                $carrier = new Carrier($carrier_id,$this->context->cart->id_lang);
+        if (Tools::getValue('geturl') == 'yes') {
 
-                $customer_addresses = $this->context->customer->getAddresses($this->context->language->id);
+            $carrier_id   = $this->context->cart->id_carrier;
 
-                if (count($customer_addresses) == 1)
-                    $customer_addresses[] = $customer_addresses;
+            $carrier = new Carrier($carrier_id,$this->context->cart->id_lang);
 
-                $matched_address_id = false;
-                foreach ($customer_addresses as $customer_address)
-                {
-                    if (isset($customer_address['address1']))
-                    {
-                        $billing  = new Address($customer_address['id_address']);
+            $customer_addresses = $this->context->customer->getAddresses($this->context->language->id);
+
+            if (count($customer_addresses) == 1) {
+                $customer_addresses[] = $customer_addresses;
+            }
+
+            $matched_address_id = false;
+            foreach ($customer_addresses as $customer_address) {
+                if (isset($customer_address['address1'])) {
+                    $billing  = new Address($customer_address['id_address']);
+                    $user_bill = $billing->firstname.' '.$billing->lastname.' '.$billing->company;
+                    $company = isset($address['company']) ? $address['company'] : '';
+                    $api_name = $address['firstname']. ' '. $address['lastname'].' '.$company;
+
+                    if (Common::matchstr($user_bill,$api_name) && Common::matchstr($customer_address['address1'], $address['street']) &&
+                        Common::matchstr($customer_address['postcode'], $address['zip']) &&
+                        Common::matchstr($customer_address['city'], $address['city']) &&
+                        Common::matchstr(Country::getIsoById($customer_address['id_country']), $address['country']))
+
+                        $matched_address_id = $customer_address['id_address'];
+                } else {
+                    foreach ($customer_address as $c_address) {
+                        $billing  = new Address($c_address['id_address']);
 
                         $user_bill = $billing->firstname.' '.$billing->lastname.' '.$billing->company;
                         $company = isset($address['company']) ? $address['company'] : '';
                         $api_name = $address['firstname']. ' '. $address['lastname'].' '.$company;
 
-                        if (Common::matchstr($user_bill,$api_name) && Common::matchstr($customer_address['address1'], $address['street']) &&
-                            Common::matchstr($customer_address['postcode'], $address['zip']) &&
-                            Common::matchstr($customer_address['city'], $address['city']) &&
-                            Common::matchstr(Country::getIsoById($customer_address['id_country']), $address['country']))
-
-                            $matched_address_id = $customer_address['id_address'];
-                    }
-                    else
-                    {
-                        foreach ($customer_address as $c_address)
-                        {
-                            $billing  = new Address($c_address['id_address']);
-
-                            $user_bill = $billing->firstname.' '.$billing->lastname.' '.$billing->company;
-                            $company = isset($address['company']) ? $address['company'] : '';
-                            $api_name = $address['firstname']. ' '. $address['lastname'].' '.$company;
-
-
-                            if (Common::matchstr($user_bill,$api_name) &&  Common::matchstr($c_address['address1'], $address['street']) &&
-                                Common::matchstr($c_address['postcode'], $address['zip']) &&
-                                Common::matchstr($c_address['city'], $address['city']) &&
-                                Common::matchstr(Country::getIsoById($c_address['id_country']), $address['country'])
-                            )
-                                $matched_address_id = $c_address['id_address'];
-                        }
-                    }
-
-                }
-                if (!$matched_address_id)
-                {
-                    $addressnew              = new Address();
-                    $addressnew->id_customer = (int)$this->context->customer->id;
-
-                    $addressnew->firstname = !empty($address['firstname']) ? $address['firstname'] : $billing->firstname;
-                    $addressnew->lastname  = !empty($address['lastname']) ? $address['lastname'] : $billing->lastname;
-                    $addressnew->company   = isset($address['company']) ? $address['company'] : '';
-
-                    $addressnew->phone        = $billing->phone;
-                    $addressnew->phone_mobile = $billing->phone_mobile;
-
-                    $addressnew->address1 = $address['street'];
-                    $addressnew->postcode = $address['zip'];
-                    $addressnew->city     = $address['city'];
-                    $addressnew->country  = $address['country'];
-                    $addressnew->alias    = 'Bimport-'.date('Y-m-d');
-                    $addressnew->id_country = Country::getByIso($address['country']);
-                    $addressnew->save();
-
-                    $matched_address_id = $addressnew->id;
-                }
-                /*
-                $this->context->cart->updateAddressId($this->context->cart->id_address_delivery, $matched_address_id);
-                $this->context->cart->updateAddressId($this->context->cart->id_address_invoice, $matched_address_id);
-                */
-
-                $sql = 'UPDATE `'._DB_PREFIX_.'cart_product`
-                        SET `id_address_delivery` = '.(int)$matched_address_id.'
-                        WHERE  `id_cart` = '.(int)$this->context->cart->id;
-                Db::getInstance()->execute($sql);
-
-                $sql = 'UPDATE `'._DB_PREFIX_.'customization`
-                        SET `id_address_delivery` = '.(int)$matched_address_id.'
-                        WHERE  `id_cart` = '.(int)$this->context->cart->id;
-                Db::getInstance()->execute($sql);
-
-                $this->context->cart->id_address_invoice  = (int)$matched_address_id;
-                $this->context->cart->id_address_delivery = (int)$matched_address_id;
-                if(version_compare(_PS_VERSION_,'1.7','>=')){
-
-                    $billing = new Address($this->context->cart->id_address_invoice);
-                    $shipping = new Address($this->context->cart->id_address_delivery);
-                    $billing->update();
-                    $shipping->update();
-                    $this->context->cart->checkAndUpdateAddresses();
-
-                }
-
-                $this->context->cart->setDeliveryOption(array($this->context->cart->id_address_delivery => $carrier->id));
-                $this->context->cart->update();
-
-                if (Configuration::get('PS_ORDER_PROCESS_TYPE') == 1)
-                {
-                    $return = array(
-                        'success' => true,
-                        'action'  => array(
-                            'method'                                 => 'updateCarrierAndGetPayments',
-                            //updateExtraCarrier
-                            'gift'                                   => 0,
-                            'gift_message'                           => '',
-                            'recyclable'                             => 0,
-                            'delivery_option['.$matched_address_id.']' => $carrier->id.',',
-                            'ajax'                                   => true,
-                            'token'                                  => Tools::getToken(false),
+                        if (Common::matchstr($user_bill,$api_name) &&  Common::matchstr($c_address['address1'], $address['street']) &&
+                            Common::matchstr($c_address['postcode'], $address['zip']) &&
+                            Common::matchstr($c_address['city'], $address['city']) &&
+                            Common::matchstr(Country::getIsoById($c_address['id_country']), $address['country'])
                         )
-                    );
-                }
-                else
-                {
-                    $return = array(
-                        'success' => true,
-                        'action'  => array(
-                            'method'             => 'updateExtraCarrier',
-                            'id_delivery_option' => $carrier_id.',',
-                            'id_address'         => $matched_address_id,
-                            'allow_refresh'      => 1,
-                            'ajax'               => true,
-                            'token'              => Tools::getToken(false),
-                        )
-                    );
+                            $matched_address_id = $c_address['id_address'];
+                    }
                 }
             }
-            else
-            {
-                $this->context->smarty->assign(array(
-                    'ps_version' => _PS_VERSION_,
-                    'method'     => $this->method
-                ));
-                $this->context->smarty->assign('company',isset($address['company']) ? $address['company']: '');
-                $this->context->smarty->assign('firstname', isset($address['firstname']) ? $address['firstname'] : '');
-                $this->context->smarty->assign('lastname', isset($address['lastname']) ? $address['lastname'] : '');
-                $this->context->smarty->assign('address', $address['street']);
-                $this->context->smarty->assign('zipcode', $address['zip']);
-                $this->context->smarty->assign('city', $address['city']);
-                $this->context->smarty->assign('country', Country::getNameById($this->context->language->id,Country::getByIso($address['country'])));
-                if (Module::isInstalled('onepagecheckout'))
-                    $previouslink = $this->context->link->getPageLink('order.php',true);
-                else
-                    $previouslink = $this->context->link->getPageLink('order.php', true).'?step=3';
-                $this->context->smarty->assign('previousLink', $previouslink);
 
-                $html   = $this->context->smarty->fetch(_PS_MODULE_DIR_.'billmategateway/views/templates/front/wrongaddress.tpl');
-                $return = array('success' => false, 'content' => $html, 'popup' => true);
+            if (!$matched_address_id) {
+                $billing  = new Address($this->context->cart->id_address_invoice);
+                $addressnew              = new Address();
+                $addressnew->id_customer = (int)$this->context->customer->id;
+
+                $addressnew->firstname = !empty($address['firstname']) ? $address['firstname'] : $billing->firstname;
+                $addressnew->lastname  = !empty($address['lastname']) ? $address['lastname'] : $billing->lastname;
+                $addressnew->company   = isset($address['company']) ? $address['company'] : '';
+
+                $addressnew->phone        = $billing->phone;
+                $addressnew->phone_mobile = $billing->phone_mobile;
+
+                $addressnew->address1 = $address['street'];
+                $addressnew->postcode = $address['zip'];
+                $addressnew->city     = $address['city'];
+                $addressnew->country  = $address['country'];
+                $addressnew->alias    = 'Bimport-'.date('Y-m-d');
+                $addressnew->id_country = Country::getByIso($address['country']);
+                $addressnew->save();
+
+                $matched_address_id = $addressnew->id;
             }
 
-            return $return;
+            $sql = 'UPDATE `'._DB_PREFIX_.'cart_product`
+                    SET `id_address_delivery` = '.(int)$matched_address_id.'
+                    WHERE  `id_cart` = '.(int)$this->context->cart->id;
+            Db::getInstance()->execute($sql);
+
+            $sql = 'UPDATE `'._DB_PREFIX_.'customization`
+                    SET `id_address_delivery` = '.(int)$matched_address_id.'
+                    WHERE  `id_cart` = '.(int)$this->context->cart->id;
+            Db::getInstance()->execute($sql);
+
+            $this->context->cart->id_address_invoice  = (int)$matched_address_id;
+            $this->context->cart->id_address_delivery = (int)$matched_address_id;
+            if (version_compare(_PS_VERSION_,'1.7','>=')) {
+                $billing = new Address($this->context->cart->id_address_invoice);
+                $shipping = new Address($this->context->cart->id_address_delivery);
+                $billing->update();
+                $shipping->update();
+                $this->context->cart->checkAndUpdateAddresses();
+            }
+
+            $this->context->cart->setDeliveryOption(array($this->context->cart->id_address_delivery => $carrier->id));
+            $this->context->cart->update();
+
+            if (Configuration::get('PS_ORDER_PROCESS_TYPE') == 1) {
+                $return = array(
+                    'success' => true,
+                    'action'  => array(
+                        'method'                                 => 'updateCarrierAndGetPayments',
+                        //updateExtraCarrier
+                        'gift'                                   => 0,
+                        'gift_message'                           => '',
+                        'recyclable'                             => 0,
+                        'delivery_option['.$matched_address_id.']' => $carrier->id.',',
+                        'ajax'                                   => true,
+                        'token'                                  => Tools::getToken(false),
+                    )
+                );
+            } else {
+                $return = array(
+                    'success' => true,
+                    'action'  => array(
+                        'method'             => 'updateExtraCarrier',
+                        'id_delivery_option' => $carrier_id.',',
+                        'id_address'         => $matched_address_id,
+                        'allow_refresh'      => 1,
+                        'ajax'               => true,
+                        'token'              => Tools::getToken(false),
+                    )
+                );
+            }
+        } else {
+            $this->context->smarty->assign(array(
+                'ps_version' => _PS_VERSION_,
+                'method'     => $this->method
+            ));
+            $this->context->smarty->assign('company',isset($address['company']) ? $address['company']: '');
+            $this->context->smarty->assign('firstname', isset($address['firstname']) ? $address['firstname'] : '');
+            $this->context->smarty->assign('lastname', isset($address['lastname']) ? $address['lastname'] : '');
+            $this->context->smarty->assign('address', $address['street']);
+            $this->context->smarty->assign('zipcode', $address['zip']);
+            $this->context->smarty->assign('city', $address['city']);
+            $this->context->smarty->assign('country', Country::getNameById($this->context->language->id,Country::getByIso($address['country'])));
+            if (Module::isInstalled('onepagecheckout')) {
+                $previouslink = $this->context->link->getPageLink('order.php',true);
+            } else {
+                $previouslink = $this->context->link->getPageLink('order.php', true).'?step=3';
+            }
+
+            $this->context->smarty->assign('previousLink', $previouslink);
+            $html   = $this->context->smarty->fetch(_PS_MODULE_DIR_.'billmategateway/views/templates/front/wrongaddress.tpl');
+            $return = array('success' => false, 'content' => $html, 'popup' => true);
         }
-        else
-            return true;
 
+        return $return;
     }
 
     /**
@@ -779,19 +717,15 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
                 break;
             case 'bankpay':
             case 'cardpay':
-                if (!isset($result['code']))
-                    if($this->ajax) {
+                if (!isset($result['code'])) {
+                    if ($this->ajax) {
                         $return = array('success' => true, 'redirect' => $result['url']);
                     } else {
-                        header('Location: '.$result['url']);
+                        header('Location: ' . $result['url']);
                     }
-
-                else
-                {
-                    //Logger::addLog($result['message'], 1, $result['code'], 'Cart', $this->context->cart->id);
+                } else {
                     $return = array('success' => false, 'content' => utf8_encode($result['message']));
                 }
-
 
                 break;
         }
@@ -822,4 +756,61 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
         }
         return $this;
     }
+
+    /**
+     * @return bool
+     */
+    protected function isAddressMatched($address)
+    {
+        $billing  = new Address($this->context->cart->id_address_invoice);
+        $shipping = new Address($this->context->cart->id_address_delivery);
+
+        $user_ship = $shipping->firstname.' '.$shipping->lastname.' '.$shipping->company;
+        $user_bill = $billing->firstname.' '.$billing->lastname.' '.$billing->company;
+        if (empty($address['company'])) {
+            $api_matched_name = Common::matchstr($shipping->firstname,$address['lastname'])
+                && Common::matchstr($shipping->lastname,$address['lastname']);
+        } else {
+            $prestacompany = explode(' ', $billing->company);
+            $apicompany = explode(' ', $address['company']);
+            $matched_company = array_intersect($prestacompany, $apicompany);
+            $api_matched_name = !empty($matched_company);
+        }
+
+        $address_same = Common::matchstr($user_ship, $user_bill) &&
+            Common::matchstr($billing->city, $shipping->city) &&
+            Common::matchstr($billing->postcode, $shipping->postcode) &&
+            Common::matchstr($billing->address1, $shipping->address1);
+        return(
+            $api_matched_name
+            && Common::matchstr($shipping->address1, $address['street'])
+            && Common::matchstr($shipping->postcode, $address['zip'])
+            && Common::matchstr($shipping->city, $address['city'])
+            && Common::matchstr($address['country'], Country::getIsoById($shipping->id_country))
+            && $address_same
+        );
+    }
+
+    /**
+     * @return array
+     */
+    protected function getAddressFromService()
+    {
+        return $this->billmate->getAddress(array('pno' => $this->pno));
+    }
+
+    /**
+     * @param $address
+     *
+     * @return array
+     */
+    protected function convertAddress($address)
+    {
+        foreach ($address as $key => $value) {
+            $address[$key] = $this->convertToUtf($value);
+        }
+
+        return $address;
+    }
+
 }

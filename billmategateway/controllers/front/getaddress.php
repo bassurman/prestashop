@@ -57,7 +57,7 @@ class BillmategatewayGetaddressModuleFrontController extends BaseBmFront
             $response['success'] = true;
             $encoded_address = array();
             foreach ($address as $key => $row) {
-                $encoded_address[$key] = mb_convert_encoding($row,'UTF-8','auto');
+                $encoded_address[$key] = $this->convertToUtf($row);
             }
 
             $country_id = Country::getIdByName($this->context->language->id, $encoded_address['country']);
@@ -66,7 +66,7 @@ class BillmategatewayGetaddressModuleFrontController extends BaseBmFront
 
         } else {
             $response['success'] = false;
-            $response['message'] = mb_convert_encoding($address['message'], 'UTF-8', 'auto');
+            $response['message'] = $this->convertToUtf($address['message']);
         }
         die(Tools::jsonEncode($response));
     }

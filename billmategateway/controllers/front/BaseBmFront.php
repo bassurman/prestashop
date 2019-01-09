@@ -64,4 +64,10 @@ class BaseBmFront extends ModuleFrontControllerCore
         $this->billmate = $this->getBillmateConnection($this->paymentMethod->testMode);
         return $this;
     }
+
+    protected function convertToUtf($value)
+    {
+        return mb_convert_encoding($value,'UTF-8','auto');
+    }
+
 }
