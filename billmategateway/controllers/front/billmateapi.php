@@ -50,19 +50,11 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
     {
         $this->definePluginConstants();
         $this->defineProperties();
-
-        $this->pno = $this->method == 'invoice' || $this->method == 'partpay'
-            ? ((Tools::getIsset('pno_billmateinvoice'))
-                ? Tools::getValue('pno_billmateinvoice')
-                : (Tools::getIsset('pno_billmatepartpay')
-                    ? Tools::getValue('pno_billmatepartpay')
-                    : ''))
-            : '';
-        $this->pno = $this->method == 'invoiceservice' ? Tools::getValue('pno_billmateinvoiceservice') : $this->pno;
+        $this->pno = $this->getPno();
         /**
-         * @var $data PaymentData
+         * @var $requestData PaymentData
          */
-        $data = array();
+        $requestData = array();
 
         switch ($this->method) {
             case 'invoice':
@@ -71,65 +63,37 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
                 if(Tools::getIsset('invoice_address') && class_exists('BillmateMethodInvoiceservice')) {
                     $this->invoiceservice = true;
                 }
-
                 if(Tools::getValue('geturl') == 'yes') {
                     $this->checkAddress();
                 }
-
-                $data = $this->prepareInvoice($this->method);
+                $requestData = $this->prepareInvoice($this->method);
                 break;
-
             case 'bankpay':
             case 'cardpay':
-                $data = $this->prepareDirect($this->method);
+                $requestData = $this->prepareDirect($this->method);
                 break;
         }
 
         // Populate Data with the Customer Data and Cart stuff
-        $data['Customer'] = $this->prepareCustomer();
-        $data['Articles'] = $this->prepareArticles();
+        $requestData['Customer'] = $this->prepareCustomer();
+        $requestData['Articles'] = $this->prepareArticles();
         $discounts = $this->prepareDiscounts();
+
         if (count($discounts) > 0) {
             foreach ($discounts as $discount) {
-                array_push($data['Articles'], $discount);
+                array_push($requestData['Articles'], $discount);
+            }
+        }
+        $requestData['Cart'] = $this->prepareTotals();
+
+        if ($this->configHelper->isEnabledBMMessage()) {
+            $cartMessages = $this->getCartMessages();
+            if ($cartMessages) {
+                $requestData['Articles'] = array_merge($requestData['Articles'], $cartMessages);
             }
         }
 
-
-        $data['Cart'] = $this->prepareTotals();
-
-        if (Configuration::get('BILLMATE_MESSAGE')) {
-            $message = Message::getMessageByCartId($this->context->cart->id);
-
-            if (is_array($message) && isset($message['message'])) {
-                $message['message'] = html_entity_decode($message['message']);
-            }
-
-            if (strlen($message['message']) > 0) {
-                $data['Articles'][] = array(
-                    'quantity'   => 0,
-                    'title'      => ' ',
-                    'artnr'      => '--freetext--',
-                    'aprice'     => 0,
-                    'taxrate'    => 0,
-                    'discount'   => 0,
-                    'withouttax' => 0
-
-                );
-                $data['Articles'][] = array(
-                    'quantity'   => 0,
-                    'title'      => $message['message'],
-                    'artnr'      => '--freetext--',
-                    'aprice'     => 0,
-                    'taxrate'    => 0,
-                    'discount'   => 0,
-                    'withouttax' => 0
-
-                );
-            }
-        }
-
-        $result = $this->billmate->addPayment($data);
+        $result = $this->billmate->addPayment($requestData);
 
         $this->sendResponse($result);
     }
@@ -745,6 +709,33 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
     }
 
     /**
+     * @return string;
+     */
+    protected function getPno()
+    {
+        switch($this->method) {
+            case'invoice':
+            case'partpay':
+                if(Tools::getIsset('pno_billmateinvoice')) {
+                    $pno = Tools::getValue('pno_billmateinvoice');
+                    break;
+                }
+
+                if(Tools::getIsset('pno_billmatepartpay')) {
+                    $pno = Tools::getValue('pno_billmatepartpay');
+                    break;
+                }
+                break;
+            case'invoiceservice':
+                    $pno = Tools::getValue('pno_billmateinvoiceservice');
+                break;
+            default:
+                $pno = '';
+        }
+        return $pno;
+    }
+
+    /**
      * @return $this
      */
     public function definePluginConstants()
@@ -813,4 +804,38 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
         return $address;
     }
 
+    /**
+     * @return array
+     */
+    protected function getCartMessages()
+    {
+        $messages = [];
+        $cartMessage = Message::getMessageByCartId($this->context->cart->id);
+
+        if (is_array($cartMessage) && isset($cartMessage['message']) && strlen($cartMessage['message']) > 0) {
+            $messages[] = array(
+                'quantity'   => 0,
+                'title'      => ' ',
+                'artnr'      => '--freetext--',
+                'aprice'     => 0,
+                'taxrate'    => 0,
+                'discount'   => 0,
+                'withouttax' => 0
+
+            );
+            $messages[] = array(
+                'quantity'   => 0,
+                'title'      => html_entity_decode($cartMessage['message']),
+                'artnr'      => '--freetext--',
+                'aprice'     => 0,
+                'taxrate'    => 0,
+                'discount'   => 0,
+                'withouttax' => 0
+
+            );
+        }
+
+
+        return $messages;
+    }
 }

@@ -180,6 +180,12 @@ class BmConfigHelper extends Helper
         return $this->mapPaymentMethods;
     }
 
+
+    public function isEnabledBMMessage()
+    {
+        return Configuration::get('BILLMATE_MESSAGE');
+    }
+
     public function updateConfig()
     {
         $billmateId     = Tools::getValue('billmateId');

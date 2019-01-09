@@ -69,5 +69,4 @@ class BaseBmFront extends ModuleFrontControllerCore
     {
         return mb_convert_encoding($value,'UTF-8','auto');
     }
-
 }
