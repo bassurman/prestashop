@@ -22,6 +22,7 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
 {
 
     protected $method;
+    
     public $module;
     /**
      * The total sum for costs
@@ -41,7 +42,6 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
     /** @var  pno | The personal number if invoice or Partpay */
     protected $pno;
     protected $billmate;
-    protected $coremodule;
     protected $handling_fee = false;
     protected $handling_taxrate = false;
     protected $invoiceservice = false;
@@ -54,6 +54,18 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
         /**
          * @var $requestData PaymentData
          */
+        $requestData = $this->getRequestApiData();
+
+        $result = $this->billmateConnection->addPayment($requestData);
+        $this->sendResponse($result);
+    }
+
+
+    /**
+     * @return array
+     */
+    protected function getRequestApiData()
+    {
         $requestData = array();
 
         switch ($this->method) {
@@ -92,10 +104,7 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
                 $requestData['Articles'] = array_merge($requestData['Articles'], $cartMessages);
             }
         }
-
-        $result = $this->billmate->addPayment($requestData);
-
-        $this->sendResponse($result);
+        return $requestData;
     }
 
     /**
@@ -173,11 +182,11 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
         return $articles_arr;
     }
 
+    /**
+     * @return array
+     */
     public function prepareDiscounts()
     {
-        if (!isset($this->coremodule) || !is_object($this->coremodule)) {
-            $this->coremodule = new BillmateGateway();
-        }
         $details = $this->context->cart->getSummaryDetails(null, true);
         $cartRules = $this->context->cart->getCartRules();
         $title = '';
@@ -200,7 +209,7 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
                 $discounts[]    = array(
                     'quantity'   => 1,
                     'artnr'      => 'discount-'.$key,
-                    'title'      => $title.sprintf($this->coremodule->l('Discount %s%% VAT'), $key),
+                    'title'      => $title.sprintf($this->l('Discount %s%% VAT','billmategateway'), $key),
                     'aprice'     => -($discount_amount * 100),
                     'taxrate'    => $key,
                     'discount'   => 0,
@@ -227,7 +236,7 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
                 $total          = -($discount_amount * $gift['cart_quantity'] * 100);
                 $discounts[]    = array(
                     'quantity'   => $gift['cart_quantity'],
-                    'artnr'      => $this->coremodule->l('Discount'),
+                    'artnr'      => $this->l('Discount', 'billmategateway'),
                     'title'      => $gift['name'],
                     'aprice'     => $price - round($discount_amount * 100, 0),
                     'taxrate'    => $taxrate,
@@ -401,9 +410,7 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
         if (Tools::getValue('geturl') == 'yes') {
 
             $carrier_id   = $this->context->cart->id_carrier;
-
             $carrier = new Carrier($carrier_id,$this->context->cart->id_lang);
-
             $customer_addresses = $this->context->customer->getAddresses($this->context->language->id);
 
             if (count($customer_addresses) == 1) {
@@ -493,7 +500,6 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
                     'success' => true,
                     'action'  => array(
                         'method'                                 => 'updateCarrierAndGetPayments',
-                        //updateExtraCarrier
                         'gift'                                   => 0,
                         'gift_message'                           => '',
                         'recyclable'                             => 0,
@@ -616,13 +622,14 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
     public function sendResponse($result)
     {
         $return = array();
-        switch ($this->method)
-        {
+        switch ($this->method) {
             case 'invoice':
             case 'partpay':
             case 'invoiceservice':
-                if (!isset($result['code']) && (isset($result['number']) && is_numeric($result['number']) && $result['number'] > 0))
-                {
+                if (!isset($result['code'])&&
+                    (isset($result['number']) &&
+                    is_numeric($result['number']) &&
+                    $result['number'] > 0)) {
                     $status   = ($this->method == 'invoice') ? Configuration::get('BINVOICE_ORDER_STATUS') : Configuration::get('BPARTPAY_ORDER_STATUS');
                     $status = ($this->method == 'invoiceservice') ? Configuration::get('BINVOICESERVICE_ORDER_STATUS') : $status;
                     $status = ($result['status'] == 'Pending') ? Configuration::get('BILLMATE_PAYMENT_PENDING') : $status;
@@ -630,17 +637,14 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
                     $total    = $this->context->cart->getOrderTotal();
                     $customer = new Customer((int)$this->context->cart->id_customer);
                     $orderId = 0;
-                    if ($this->method == 'partpay')
-                    {
+                    if ($this->method == 'partpay') {
                         $this->paymentMethod->validateOrder((int)$this->context->cart->id,
                             $status,
                             ($this->method == 'invoice') ? $this->paid_amount / 100 : $total,
                             $this->paymentMethod->displayName,
                             null, $extra, null, false, $customer->secure_key);
                         $orderId = $this->paymentMethod->currentOrder;
-                    }
-                    else
-                    {
+                    } else {
                         $this->paymentMethod->validateOrder((int)$this->context->cart->id,
                             $status,
                             ($this->method == 'invoice' || $this->method == 'invoiceservice') ? $this->paid_amount / 100 : $total,
@@ -654,7 +658,7 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
                         'orderid' => (Configuration::get('BILLMATE_SEND_REFERENCE') == 'reference') ? $this->paymentMethod->currentOrderReference : $this->paymentMethod->currentOrder
                     );
 
-                    $this->billmate->updatePayment($values);
+                    $this->billmateConnection->updatePayment($values);
 
                     $url                = 'order-confirmation&id_cart='.(int)$this->context->cart->id.
                                           '&id_module='.(int)$this->getmoduleId('billmate'.$this->method).
@@ -662,19 +666,17 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
                                           '&key='.$customer->secure_key;
                     $return['success']  = true;
                     $return['redirect'] = $this->context->link->getPageLink($url,true);
-                    if(isset($this->context->cookie->billmatepno))
+                    if(isset($this->context->cookie->billmatepno)) {
                         unset($this->context->cookie->billmatepno);
-                }
-                else
-                {
-                    if (in_array($result['code'],array(2401,2402,2403,2404,2405)))
-                    {
+                    }
+                } else {
+                    if (in_array($result['code'],array(2401,2402,2403,2404,2405))) {
                         $result = $this->checkAddress();
 
-                        if (is_array($result))
+                        if (is_array($result)) {
                             die(Tools::jsonEncode($result));
+                        }
                     }
-                    //Logger::addLog($result['message'], 1, $result['code'], 'Cart', $this->context->cart->id);
                     $return = array('success' => false, 'content' => utf8_encode($result['message']));
                 }
 
@@ -787,7 +789,7 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
      */
     protected function getAddressFromService()
     {
-        return $this->billmate->getAddress(array('pno' => $this->pno));
+        return $this->billmateConnection->getAddress(array('pno' => $this->pno));
     }
 
     /**
@@ -834,8 +836,6 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
 
             );
         }
-
-
         return $messages;
     }
 }

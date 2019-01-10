@@ -20,30 +20,21 @@
 
 class BillmategatewayCallbackModuleFrontController extends BaseBmFront
 {
-
-    public $billmate;
-    protected $method;
     protected $cart_id;
-    public $module;
-    protected $coremodule;
-
 
     private function checkOrder($cart_id)
     {
         $order = Order::getOrderByCartId($cart_id);
-        if (!$order)
-        {
+        if (!$order) {
             sleep(1);
             $this->checkOrder($cart_id);
-        }
-        else
+        } else {
             return $order;
-
+        }
     }
 
     public function postProcess()
     {
-        $this->method = Tools::getValue('method');
         $this->defineProperties();
 
         $input = Tools::file_get_contents('php://input');
@@ -59,11 +50,11 @@ class BillmategatewayCallbackModuleFrontController extends BaseBmFront
             $value
         );
         }
-        $data = $this->billmate->verify_hash($post);
+        $data = $this->billmateConnection->verify_hash($post);
 
         $paymentInfo = array();
         if (!isset($data['code']) && !isset($data['error'])) {
-            $paymentInfo = $this->billmate->getPaymentinfo(array('number' => $data['number']));
+            $paymentInfo = $this->billmateConnection->getPaymentinfo(array('number' => $data['number']));
         }
 
         $displayName = $this->paymentMethod->displayName;
@@ -75,7 +66,7 @@ class BillmategatewayCallbackModuleFrontController extends BaseBmFront
         }
 
         if (!isset($data['code']) && !isset($data['error'])) {
-            $paymentInfo = $this->billmate->getPaymentinfo(array('number' => $data['number']));
+            $paymentInfo = $this->billmateConnection->getPaymentinfo(array('number' => $data['number']));
             if (!isset($paymentInfo['code']) AND $this->method != 'checkout') {
                 switch($paymentInfo['PaymentData']['method']) {
                     case '4':
@@ -350,7 +341,7 @@ class BillmategatewayCallbackModuleFrontController extends BaseBmFront
                 'number'  => $data['number'],
                 'orderid' => (Configuration::get('BILLMATE_SEND_REFERENCE') == 'reference') ? $this->paymentMethod->currentOrderReference : $this->paymentMethod->currentOrder
             );
-            $this->billmate->updatePayment($values);
+            $this->billmateConnection->updatePayment($values);
 
             if ($this->paymentMethod->authorization_method == 'sale' && $this->method == 'cardpay')
             {
@@ -358,7 +349,7 @@ class BillmategatewayCallbackModuleFrontController extends BaseBmFront
                 $values['PaymentData'] = array(
                     'number' => $data['number']
                 );
-                $this->billmate->activatePayment($values);
+                $this->billmateConnection->activatePayment($values);
             }
             unlink($lockfile);
             exit('finalize');

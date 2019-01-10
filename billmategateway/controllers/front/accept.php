@@ -23,9 +23,7 @@ class BillmategatewayAcceptModuleFrontController extends BaseBmFront
 
     public $module;
     protected $method;
-    protected $billmate;
     protected $cart_id;
-    protected $coremodule;
 
     /**
      * A recursive method which delays order-confirmation until order is processed
@@ -64,8 +62,7 @@ class BillmategatewayAcceptModuleFrontController extends BaseBmFront
         $this->defineProperties();
 
         $_POST               = !empty($_POST) ? $_POST : $_GET;
-        $data               = $this->billmate->verify_hash($_POST);
-
+        $data               = $this->billmateConnection->verify_hash($_POST);
 
         $order               = $data['orderid'];
         $order               = explode('-', $order);
@@ -76,7 +73,7 @@ class BillmategatewayAcceptModuleFrontController extends BaseBmFront
 
         $paymentInfo = array();
         if (!isset($data['code']) && !isset($data['error'])) {
-            $paymentInfo = $this->billmate->getPaymentinfo(array('number' => $data['number']));
+            $paymentInfo = $this->billmateConnection->getPaymentinfo(array('number' => $data['number']));
         }
 
 
@@ -89,8 +86,7 @@ class BillmategatewayAcceptModuleFrontController extends BaseBmFront
         }
 
 
-        if (!isset($data['code']) && !isset($data['error']))
-        {
+        if (!isset($data['code']) && !isset($data['error'])) {
             if (!isset($paymentInfo['code']) AND $this->method != 'checkout') {
                 switch($paymentInfo['PaymentData']['method']) {
                     case '4':
@@ -166,7 +162,7 @@ class BillmategatewayAcceptModuleFrontController extends BaseBmFront
 
 
                 $return = array();
-                $paymentInfo = $this->billmate->getPaymentinfo(array('number' => $data['number']));
+                $paymentInfo = $this->billmateConnection->getPaymentinfo(array('number' => $data['number']));
                 $result = $paymentInfo;
 
                 if (!isset($result['code']) && (isset($result['PaymentData']['order']['number']) && is_numeric($result['PaymentData']['order']['number']) && $result['PaymentData']['order']['number'] > 0)) {
@@ -444,7 +440,7 @@ class BillmategatewayAcceptModuleFrontController extends BaseBmFront
                 'number'  => $data['number'],
                 'orderid' => (Configuration::get('BILLMATE_SEND_REFERENCE') == 'reference') ? $this->paymentMethod->currentOrderReference : $this->paymentMethod->currentOrder
             );
-            $this->billmate->updatePayment($values);
+            $this->billmateConnection->updatePayment($values);
 
             if ($this->paymentMethod->authorization_method == 'sale' && $this->method == 'cardpay')
             {
@@ -452,7 +448,7 @@ class BillmategatewayAcceptModuleFrontController extends BaseBmFront
                 $values['PaymentData'] = array(
                     'number' => $data['number']
                 );
-                $this->billmate->activatePayment($values);
+                $this->billmateConnection->activatePayment($values);
             }
             unlink($lockfile);
             if(isset($this->context->cookie->billmatepno))

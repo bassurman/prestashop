@@ -27,6 +27,26 @@ class BaseBmFront extends ModuleFrontControllerCore
      */
     protected $configHelper;
 
+    /**
+     * @var string
+     */
+    protected $method;
+
+    /**
+     * @var BillMate
+     */
+    protected $billmateConnection;
+
+    /**
+     * @var BillmateGateway
+     */
+    protected $paymentMethod;
+
+    /**
+     * @var BillmateGateway
+     */
+    protected $coremodule;
+
     public function __construct()
     {
         $this->configHelper = new BmConfigHelper();
@@ -61,7 +81,7 @@ class BaseBmFront extends ModuleFrontControllerCore
     {
         $this->paymentMethod = $this->getPaymentMethodClass();
         $this->coremodule = new BillmateGateway();
-        $this->billmate = $this->getBillmateConnection($this->paymentMethod->testMode);
+        $this->billmateConnection = $this->getBillmateConnection($this->paymentMethod->testMode);
         return $this;
     }
 
