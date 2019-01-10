@@ -80,7 +80,8 @@ class BmConfigHelper extends Helper
      */
     public function getPaymentModules($onlyKeys = false)
     {
-        if ($onlyKeys) {
+        if ($onlyKeys)
+        {
             return array_keys($this->payment_modules);
         }
 
@@ -89,9 +90,11 @@ class BmConfigHelper extends Helper
 
     public function getAvailableMethods()
     {
-        if (is_null($this->availMethods)) {
+        if (is_null($this->availMethods))
+        {
             $bmConnection = $this->getBillmateConnection();
-            if ($bmConnection) {
+            if ($bmConnection)
+            {
                 $result          = $bmConnection->getAccountinfo(array('time' => time()));
                 $mapCodeToMethod = $this->getPaymentMethodsMap();
                 $paymentOptions  = array();
@@ -99,23 +102,29 @@ class BmConfigHelper extends Helper
                 $logfile = _PS_CACHE_DIR_ . 'Billmate.log';
                 file_put_contents($logfile, print_r($result['paymentoptions'], true), FILE_APPEND);
 
-                foreach ($result['paymentoptions'] as $option) {
+                foreach ($result['paymentoptions'] as $option)
+                {
                     /**
                      * When invoice is unavailable and invoice service is available, use invoice service as invoice
                      */
-                    if ($option['method'] == '2' && !isset($paymentOptions['1'])) {
+                    if ($option['method'] == '2' && !isset($paymentOptions['1']))
+                    {
                         $mapCodeToMethod['2'] = 'invoice';
                     }
 
                     if (isset($mapCodeToMethod[$option['method']]) &&
-                        !in_array($mapCodeToMethod[$option['method']], $paymentOptions)) {
+                        !in_array($mapCodeToMethod[$option['method']], $paymentOptions))
+                    {
                         $paymentOptions[$option['method']] = $mapCodeToMethod[$option['method']];
-                    } else {
+                    }
+                    else
+                    {
                         continue;
                     }
                 }
                 // Add checkout as payment option if available
-                if (isset($result['checkout']) && $result['checkout']) {
+                if (isset($result['checkout']) && $result['checkout'])
+                {
                     $paymentOptions['checkout'] = 'checkout';
                 }
 
@@ -132,7 +141,9 @@ class BmConfigHelper extends Helper
                 Configuration::updateValue('BINVOICESERVICE_METHOD', $invoiceMethod);
 
                 $this->availMethods = $paymentOptions;
-            } else {
+            }
+            else
+            {
                 $this->availMethods = array();
             }
         }
@@ -180,10 +191,53 @@ class BmConfigHelper extends Helper
         return $this->mapPaymentMethods;
     }
 
-
+    /**
+     * @return bool
+     */
     public function isEnabledBMMessage()
     {
         return Configuration::get('BILLMATE_MESSAGE');
+    }
+
+    /**
+     * @return string
+     */
+    public function getTermsPageUrl()
+    {
+        $cms = new CMS(
+            (int)(Configuration::get('PS_CONDITIONS_CMS_ID')),
+            (int)($this->context->cookie->id_lang)
+        );
+        $termsUrl = $this->context->link->getCMSLink($cms, $cms->link_rewrite, true);
+        return $termsUrl;
+    }
+
+    /**
+     * @return string
+     */
+    public function getPrivacyUrl()
+    {
+        $privacyPolicyPageId = (int)Configuration::get('BILLMATE_CHECKOUT_PRIVACY_POLICY');
+        if($privacyPolicyPageId) {
+            $cms = new CMS(
+                (int) ($privacyPolicyPageId),
+                (int) ($this->context->cookie->id_lang)
+            );
+            $termsUrl = $this->context->link->getCMSLink($cms, $cms->link_rewrite, true);
+            if ($termsUrl) {
+                return $termsUrl;
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * @return string
+     */
+    public function getBillmateLogo()
+    {
+        return (Configuration::get('BILLMATE_LOGO')) ? Configuration::get('BILLMATE_LOGO') : '';
     }
 
     public function updateConfig()

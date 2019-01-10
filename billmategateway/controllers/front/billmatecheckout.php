@@ -27,15 +27,14 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
     public $display_column_right = false;
     public $ssl = true;
 
-
-    /** @var int $paid_amount for use with Billmate Invoice to sett correct amount */
-    protected $paid_amount = 0;
     public $totals;
     public $tax;
     public $method = 'invoice';
 
-    public function setAddress($customer = array()) {
+    const REQUEST_METHOD = 93;
 
+    public function setAddress($customer = array())
+    {
         $address = $customer['Billing'];
         $country = isset($customer['Billing']['country']) ? $customer['Billing']['country'] : 'SE';
         $bill_phone = isset($customer['Billing']['phone']) ? $customer['Billing']['phone'] : '';
@@ -226,10 +225,6 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
     public function postProcess() {
         $response = array();
 
-        /**
-         * Discount codes
-         * Based on code found in ParentOrderControllerCore
-         */
         if (CartRule::isFeatureActive()) {
             if (Tools::isSubmit('submitAddDiscount')) {
                 if (!($code = trim(Tools::getValue('discount_name')))) {
@@ -260,13 +255,16 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
             }
         }
 
-        // UPDATE CHECKOUT with data
-        if( $this->ajax = Tools::getValue( "ajax" ) && Tools::getValue('action') == 'setShipping') {
+        $this->ajax = Tools::getValue( "ajax" );
+        if( $this->ajax && Tools::getValue('action') == 'setShipping') {
             echo Tools::jsonEncode($this->actionSetShipping());
             die();
         }
-        // Cart contents is changed from the dropdown
-        if($this->ajax = Tools::getValue('ajax') && Tools::getValue('action') == 'updateCheckout'){
+
+        if (
+            $this->ajax &&
+            Tools::getValue('action') == 'updateCheckout'
+        ) {
             if($this->context->cart->nbProducts() == 0){
                 echo Tools::jsonEncode(array('success' => false));
                 die();
@@ -278,7 +276,11 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
             die;
             
         }
-        if( $this->ajax = Tools::getValue( "ajax" ) && Tools::getValue('action') == 'setAddress') {
+
+        if (
+            $this->ajax &&
+            Tools::getValue('action') == 'setAddress'
+        ) {
             if (isset($_POST['Customer'])) {
                 $customer = $_POST['Customer'];
             } else {
@@ -294,10 +296,13 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
             die;
         }
 
-        if( $this->ajax = Tools::getValue( "ajax" ) && Tools::getValue('action') == 'setPaymentMethod'){
+        if (
+            $this->ajax &&
+            Tools::getValue('action') == 'setPaymentMethod'
+        ) {
             $checkout = $this->fetchCheckout();
-            if(!isset($checkout['code'])){
-                switch($checkout['PaymentData']['method']){
+            if (!isset($checkout['code'])) {
+                switch ($checkout['PaymentData']['method']) {
                     case '4':
                         $this->method = 'partpay';
                         break;
@@ -317,18 +322,21 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
                 }
             }
             $checkout['debug'] = 'setPaymentMethod';
-            $result = $this->updateCheckout($checkout);
+            $this->updateCheckout($checkout);
             echo Tools::jsonEncode(array('success' => true));
             die;
         }
-        if( $this->ajax = Tools::getValue( "ajax" ) && Tools::getValue('action') == 'validateOrder') {
+
+        if (
+            $this->ajax &&
+            Tools::getValue('action') == 'validateOrder'
+        ) {
             $checkout = $this->fetchCheckout();
             $this->ajax = true;
             $result = $this->sendResponse($checkout);
             
             echo Tools::jsonEncode($result);
             die();
-        
         }
     }
 
@@ -357,11 +365,9 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
                             }
                         }
                         $this->context->cart->setDeliveryOption($realOption);
-                    }
-                    else {
+                    } else {
                         $this->context->cart->setDeliveryOption($delivery_option);
                     }
-
                 }
                 $updated = true;
                 $cartUpdateResult = $this->context->cart->update();
@@ -371,9 +377,8 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
                         'vouchererrors' => Tools::displayError('Could not save carrier selection'),
                     ));
                 }
-                $cartSaveResult = $this->context->cart->save();
+                $this->context->cart->save();
 
-                // Carrier has changed, so we check if the cart rules still apply
                 CartRule::autoRemoveFromCart($this->context);
                 CartRule::autoAddToCart($this->context);
                 $values = $this->fetchCheckout();
@@ -396,7 +401,7 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
         $return = array();
         $billmate = $this->getBillmate();
 
-        $class        = "BillmateMethod".Tools::ucfirst($this->method);
+        $class = "BillmateMethod".Tools::ucfirst($this->method);
         $this->module = new $class;
         switch ($this->method) {
             case 'invoice':
@@ -408,27 +413,23 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
                     $status = ($this->method == 'invoiceservice') ? Configuration::get('BINVOICESERVICE_ORDER_STATUS') : $status;
                     $status = ($result['PaymentData']['order']['status'] == 'Pending') ? Configuration::get('BILLMATE_PAYMENT_PENDING') : $status;
 
-                    if(Validate::isLoadedObject($this->context->cart) && $this->context->cart->OrderExists() == false) {
+                    if (Validate::isLoadedObject($this->context->cart) && $this->context->cart->OrderExists() == false) {
                         $extra = array('transaction_id' => $result['PaymentData']['order']['number']);
-                        $total = $this->context->cart->getOrderTotal();
                         $total = $result['Cart']['Total']['withtax'];
                         $total = $total/100;
                         $customer = new Customer((int)$this->context->cart->id_customer);
-                        $orderId = 0;
                         if ($this->method == 'partpay') {
                             $this->module->validateOrder((int)$this->context->cart->id,
                                 $status,
                                 $total,
                                 $this->module->displayName,
                                 null, $extra, null, false, $customer->secure_key);
-                            $orderId = $this->module->currentOrder;
                         } else {
                             $this->module->validateOrder((int)$this->context->cart->id,
                                 $status,
                                 $total,
                                 $this->module->displayName,
                                 null, $extra, null, false, $customer->secure_key);
-                            $orderId = $this->module->currentOrder;
                         }
                         $values = array();
                         $values['PaymentData'] = array(
@@ -444,12 +445,8 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
                         array('billmate_hash' => Common::getCartCheckoutHash())
                     );
 
-                    /*$url = 'order-confirmation&id_cart=' . (int)$this->context->cart->id .
-                        '&id_module=' . (int)$this->getmoduleId('billmate' . $this->method) .
-                        '&id_order=' . (int)$orderId .
-                        '&key=' . $customer->secure_key;*/
                     $return['success'] = true;
-                    $return['redirect'] = $url; //$this->context->link->getPageLink($url, true);
+                    $return['redirect'] = $url;
                     if (isset($this->context->cookie->billmatepno))
                         unset($this->context->cookie->billmatepno);
                     Common::unsetCartCheckoutHash();
@@ -459,7 +456,6 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
                             die(Tools::jsonEncode($result));
                         }
                     }
-                    //Logger::addLog($result['message'], 1, $result['code'], 'Cart', $this->context->cart->id);
                     $_message = (isset($result['message'])) ? $result['message'] : '';
                     $return = array('success' => false, 'content' => utf8_encode($_message));
                 }
@@ -475,14 +471,12 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
                     }
                 }
                 else {
-                    //Logger::addLog($result['message'], 1, $result['code'], 'Cart', $this->context->cart->id);
                     $return = array('success' => false, 'content' => utf8_encode($result['message']));
                 }
 
-
                 break;
         }
-        return $return;//die(Tools::JsonEncode($return));
+        return $return;
     }
 
     public function initContent()
@@ -502,13 +496,9 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
             $billmatecheckouturl = $this->getCheckout();
 
             $this->context->smarty->assign('billmatecheckouturl', $billmatecheckouturl);
-
-
-            //$this->context->smarty->assign('HOOK_LEFT_COLUMN', Module::hookExec('displayLeftColumn'));
-
             $carrierBlock = $this->_getCarrierList();
             $this->context->smarty->assign('carrier_block',$carrierBlock['carrier_block']);
-            //Cart::addExtraCarriers($result);
+
             $free_shipping = false;
             foreach ($this->context->cart->getCartRules() as $rule) {
                 if ($rule['free_shipping']) {
@@ -537,13 +527,10 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
 
             $delivery_option_data = $this->getDeliveryOptionData();
             $shipping_price_with_tax = $delivery_option_data['price_with_tax'];
-            $shipping_price_without_tax = $delivery_option_data['price_without_tax'];
-            $shippin_tax = $shipping_price_with_tax - $shipping_price_without_tax;
 
             if ($shipping_price_with_tax > 0) {
                 $shipping_price_with_tax = $delivery_option_data['price_with_tax'];
                 $shipping_price_without_tax = $delivery_option_data['price_without_tax'];
-                $shippin_tax = $shipping_price_with_tax - $shipping_price_without_tax;
 
                 if(version_compare(_PS_VERSION_,'1.7','>=')) {
                     $priceFormatter = new PrestaShop\PrestaShop\Adapter\Product\PriceFormatter();
@@ -571,7 +558,7 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
                 }
             }
 
-            if(version_compare(_PS_VERSION_,'1.7','>=')){
+            if (version_compare(_PS_VERSION_,'1.7','>=')) {
                 $this->setTemplate('module:billmategateway/views/templates/front/checkout/checkout17.tpl');
             } else {
                 $this->setTemplate('checkout/checkout.tpl');
@@ -584,7 +571,6 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
         $summary = $this->context->cart->getSummaryDetails();
         $customDates = Product::getAllCustomizedDatas($this->context->cart->id);
 
-        // override customization tax rate with real tax (tax rules)
         if ($customDates) {
             foreach ($summary['products'] as &$productUpdate) {
                 if (isset($productUpdate['id_product'])) {
@@ -643,7 +629,6 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
             }
         }
 
-        // Get available cart rules and unset the cart rules already in the cart
         $available_cart_rules = CartRule::getCustomerCartRules(
             $this->context->language->id,
             (isset($this->context->customer->id) ? $this->context->customer->id : 0),
@@ -690,7 +675,6 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
             'currencyBlank' => $this->context->currency->blank,
             'show_option_allow_separate_package' => $show_option_allow_separate_package,
             'smallSize' => Image::getSize(ImageType::getFormatedName('small')),
-
         ));
 
         $this->context->smarty->assign(array(
@@ -714,7 +698,8 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
         return true;
     }
 
-    private function getCarriers() {
+    private function getCarriers()
+    {
         if (intval($this->context->cart->id_customer) > 0) {
             $carriers = $this->context->cart->simulateCarriersOutput();
         } else {
@@ -730,171 +715,27 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
     }
 
     /**
-     * Get selected delivery option
-     * If no delivery option is selected, select cheapest one
+     * @return int|mixed|null|string
      */
-    private function getDeliveryOption() {
-
-        $delivery_option = null;
-
-        if (intval($this->context->cart->id_customer) > 0) {
-            $delivery_option = $this->context->cart->getDeliveryOption(null, false, false);
-            if (version_compare(_PS_VERSION_,'1.7','>=')) {
-                $delivery_option = $this->context->cart->simulateCarrierSelectedOutput();
-                // $delivery_option = Cart::intifier($delivery_option);
-                $delivery_option = Cart::desintifier($delivery_option);
-            }
-        } else {
-            // Cart have no customer
-            $delivery_option = $this->context->cart->getDeliveryOption(null, false, false);
-            if (version_compare(_PS_VERSION_,'1.7','>=')) {
-                $delivery_option_seriaized = $this->context->cart->delivery_option;
-                if (version_compare(_PS_VERSION_,'1.7.4.4','>=')) {
-                    $delivery_option_unserialized = json_decode($delivery_option_seriaized);
-                } else {
-                    $delivery_option_unserialized = unserialize($delivery_option_seriaized);
-                }
-                if (is_array($delivery_option_unserialized) && isset($delivery_option_unserialized[0])) {
-                    $delivery_option = $delivery_option_unserialized[0];
-                }
-            }
-        }
-
-        if (!$delivery_option) {
-            $delivery_option_list = $this->getDeliveryOptions();
-            foreach ($delivery_option_list AS $i => $packages) {
-                foreach ($packages AS $iii => $carriers) {
-                    if ($carriers['is_best_price']) {
-                        $delivery_option = $iii;
-                        break;
-                    }
-                }
-            }
-            if (version_compare(_PS_VERSION_,'1.7','<')) {
-                $delivery_option = array(
-                    0 => $delivery_option
-                );
-            }
-        }
-        return $delivery_option;
+    protected function getDeliveryOption()
+    {
+        return $this->getBMDataCollector()->getDeliveryOption();
     }
 
-    private function getDeliveryOptionData() {
-        $delivery_option = $this->getDeliveryOption();
-        if (is_array($delivery_option)) {
-            $delivery_option = current($delivery_option);
-        }
-        $delivery_option_list = $this->getDeliveryOptions();
-        foreach ($delivery_option_list AS $i => $packages) {
-            foreach ($packages AS $iii => $carriers) {
-                if ($iii == $delivery_option) {
-                    foreach ($carriers['carrier_list'] AS $iv => $carrier) {
-                        return $carrier;
-                    }
-                    break;
-                }
-            }
-        }
-        return array();
+    /**
+     * @return array
+     */
+    protected function getDeliveryOptionData()
+    {
+        return $this->getBMDataCollector()->getDeliveryOptionData();
     }
 
-    private function getDeliveryOptions() {
-        if (intval($this->context->cart->id_customer) > 0) {
-            $country = 0;
-            if ($this->context->cart->id_address_delivery > 0) {
-                $delivery_address = new Address($this->context->cart->id_address_delivery);
-                if(isset($delivery_address->id_country)) {
-                    $country = $delivery_address->id_country;
-                    $delivery_option_list = $this->context->cart->getDeliveryOptionList(
-                        new Country($delivery_address->id_country),
-                        true
-                    );
-                } else {
-                    $delivery_option_list = $this->context->cart->getDeliveryOptionList();
-                }
-            } else {
-                $delivery_option_list = $this->context->cart->getDeliveryOptionList();
-            }
-
-            foreach ($delivery_option_list AS $i => $packages) {
-                foreach ($packages AS $iii => $carriers) {
-                    foreach ($carriers['carrier_list'] AS $iv => $carrier) {
-                        if (isset($delivery_option_list[$i][$iii]['carrier_list'][$iv]['instance'])) {
-                            unset($delivery_option_list[$i][$iii]['carrier_list'][$iv]['instance']);
-                        }
-                        if (isset($delivery_option_list[$i][$iii]['carrier_list'][$iv]['package_list'])) {
-                            unset($delivery_option_list[$i][$iii]['carrier_list'][$iv]['package_list']);
-                        }
-                        if (isset($delivery_option_list[$i][$iii]['carrier_list'][$iv]['product_list'])) {
-                            unset($delivery_option_list[$i][$iii]['carrier_list'][$iv]['product_list']);
-                        }
-                        $delivery_option_list[$i][$iii]['carrier_list'][$iv]['instance'] = new Carrier($iv);
-                    }
-                }
-            }
-            return $delivery_option_list;
-        }
-
-        /**
-         * Below, get shipping options when no customer saved on cart
-         */
-        $carriers = $this->getCarriers();
-
-        $delivery_option_list_from_carriers =  array(
-            0 => array()
-        );
-        $grades = array();  // id => grade
-        $prices = array();  // id => price
-        $instances = array(); // id => instance
-        foreach ($carriers AS $carrier) {
-            $id_carrier = $carrier['id_carrier'];
-            $instance = new Carrier($id_carrier);
-            $instances[$id_carrier] = $instance;
-            $grades[$id_carrier] = $instance->grade;
-            $prices[$id_carrier] = $carrier['price'];
-        }
-
-        $best_grade     = null;
-        $best_grade_id  = null;
-        $best_price     = null;
-        $best_price_id  = null;
-
-        foreach ($carriers AS $carrier) {
-            $id_carrier = $carrier['id_carrier'];
-            $grade = $grades[$id_carrier];
-            $price_with_tax = $prices[$id_carrier];
-            if (is_null($best_price) || $price_with_tax < $best_price) {
-                $best_price = $price_with_tax;
-                $best_price_carrier = $id_carrier;
-            }
-            if (is_null($best_grade) || $grade > $best_grade) {
-                $best_grade = $grade;
-                $best_grade_carrier = $id_carrier;
-            }
-        }
-
-        foreach ($carriers AS $carrier) {
-            $id_carrier = $carrier['id_carrier'];
-            $key = $id_carrier . ',';
-            $delivery_option_list_from_carriers[0][$key] = array(
-                'carrier_list' => array(
-                    $id_carrier => array(
-                        'price_with_tax' => $carrier['price'],
-                        'price_without_tax' => $carrier['price_tax_exc'],
-                        'logo' => $carrier['img'],
-                        'instance' => $instances[$id_carrier]
-                    )
-                ),
-                'is_best_price' => ($best_price_carrier == $id_carrier),
-                'is_best_grade' => ($best_grade_carrier == $id_carrier),
-                'unique_carrier' => true,
-                'total_price_with_tax' => $carrier['price'],
-                'total_price_without_tax' => $carrier['price_tax_exc'],
-                'is_free' => null,
-                'position' => $carrier['position'],
-            );
-        }
-        return $delivery_option_list_from_carriers;
+    /**
+     * @return array
+     */
+    protected function getDeliveryOptions()
+    {
+        return $this->getBMDataCollector()->getDeliveryOptions();
     }
 
     protected function _getCarrierList()
@@ -922,8 +763,9 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
                 break;
             }
         }
+
         $carriers17 = array();
-        foreach($carriers as $carrier){
+        foreach ($carriers as $carrier) {
             $temp = $carrier;
             $temp['logo'] = false;
             $temp['id'] = $carrier['id_carrier'];
@@ -1040,7 +882,6 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
 
     public function getCheckout()
     {
-
         $billmate = $this->getBillmate();
         if ($hash = Common::getCartCheckoutHash()) {
             $result = $billmate->getCheckout(array('PaymentData' => array('hash' => $hash)));
@@ -1052,18 +893,14 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
                             strtolower($result['PaymentData']['order']['status']) != 'paid'
                         )
                 ) {
-                    /** Checkout order paid, init new checkout order */
                     $result = $this->initCheckout();
                     if (!isset($result['code'])) {
                         return $result['url'];
                     }
 
                 } else {
-                    /** Checkout order not paid, update checkout order */
                     $updateResult = $this->updateCheckout($result);
                     if (!isset($updateResult['code'])) {
-
-                        /** Store returned hash */
                         $hash = $this->getHashFromUrl($updateResult['url']);
                         Common::setCartCheckoutHash($hash);
 
@@ -1071,7 +908,6 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
                         return $result['PaymentData']['url'];
                     }
                 }
-
             }
         } else {
             $result = $this->initCheckout();
@@ -1082,6 +918,57 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
     }
 
     /**
+     * @return array
+     */
+    public function initCheckout()
+    {
+        $billmate = $this->getBillmate();
+        $billmateDataCollector = $this->getBMDataCollector();
+        $billmateDataCollector->setRequestMethod(self::REQUEST_METHOD);
+        $billmateDataCollector->setPaymentMethod($this->method);
+        $requestData = $billmateDataCollector->getRequestData();
+
+        $result = $billmate->initCheckout($requestData);
+        if(!isset($result['code'])){
+            $hash = $this->getHashFromUrl($result['url']);
+            Common::setCartCheckoutHash($hash);
+        }
+        return $result;
+    }
+
+    /**
+     * @param $orderValues
+     *
+     * @return array
+     */
+    public function updateCheckout($orderValues)
+    {
+        $billmateDataCollector = $this->getBMDataCollector();
+        $billmateDataCollector->setRequestMethod(self::REQUEST_METHOD);
+        $billmateDataCollector->setPaymentMethod($this->method);
+        $billmateDataCollector->setUpdateMode(true);
+
+        $requestData = $billmateDataCollector->getRequestData();
+        $requestData['PaymentData']['number'] = $orderValues['PaymentData']['number'];
+
+        $previousTotal = $orderValues['Cart']['Total']['withtax'];
+
+        $billmate = $this->getBillmate();
+        $result = $billmate->updateCheckout($requestData);
+
+        if (is_array($result)) {
+            $result['update_checkout'] = false;
+            if($previousTotal != $requestData['Cart']['Total']['withtax']){
+                $result['update_checkout'] = true;
+            }
+            return $result;
+        } else {
+            return array('code' => 9510, 'communication error, '.$result);
+        }
+    }
+
+
+    /**
      * @return BillMate
      */
     public function getBillmate()
@@ -1090,384 +977,16 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
         return $this->getBillmateConnection($testMode);
     }
 
-    public function initCheckout()
-    {
-        $billmate = $this->getBillmate();
-        $orderValues = array();
-        // TODO all articles and stuff.
-        $orderValues = $this->prepareCheckout();
-        $orderValues['Articles'] = $this->prepareArticles();
-        $discounts = $this->prepareDiscounts();
-        if (count($discounts) > 0)
-        {
-            foreach ($discounts as $discount)
-                array_push($orderValues['Articles'], $discount);
-        }
-
-        $orderValues['Cart'] = $this->prepareTotals();
-
-        $result = $billmate->initCheckout($orderValues);
-        if(!isset($result['code'])){
-            $hash = $this->getHashFromUrl($result['url']);
-            Common::setCartCheckoutHash($hash);
-        }
-        return $result;
-    }
-
+    /**
+     * @param string $url
+     *
+     * @return mixed
+     */
     public function getHashFromUrl($url = '')
     {
         $parts = explode('/',$url);
         $sum = count($parts);
         $hash = ($parts[$sum-1] == 'test') ? str_replace('\\','',$parts[$sum-2]) : str_replace('\\','',$parts[$sum-1]);
         return $hash;
-    }
-
-    public function updateCheckout($values)
-    {
-        $billmate = $this->getBillmate();
-        $this->totals = 0;
-        $this->tax = 0;
-
-        $orderValues = $values;
-        $previousTotal = $orderValues['Cart']['Total']['withtax'];
-
-        $orderValues = array(
-            'PaymentData' => array(
-                'number' => $orderValues['PaymentData']['number'],
-                'currency' => Tools::strtoupper($this->context->currency->iso_code)
-            )
-        );
-
-        $orderValues['Articles'] = $this->prepareArticles();
-        $discounts = $this->prepareDiscounts();
-        if (count($discounts) > 0)
-        {
-            foreach ($discounts as $discount)
-                array_push($orderValues['Articles'], $discount);
-        }
-        $orderValues['Cart'] = $this->prepareTotals();
-
-
-        $result = array();
-        $result = $billmate->updateCheckout($orderValues);
-
-        if(is_array($result)){
-            if($previousTotal != $orderValues['Cart']['Total']['withtax']){
-                $result['update_checkout'] = true;
-            } else {
-                $result['update_checkout'] = false;
-
-            }
-            return $result;
-        } else {
-
-            return array('code' => 9510, 'communication error, '.$result);
-        }
-    }
-
-    public function prepareArticles()
-    {
-        $articles_arr = array();
-        $articles    = $this->context->cart->getProducts();
-        foreach ($articles as $article)
-        {
-            $taxrate       = ($article['price_wt'] == $article['price']) ? 0 : $article['rate'];
-
-            $roundedArticle = round($article['price'], 2);
-            $totalArticle = ($roundedArticle * $article['cart_quantity']) * 100;
-            $articles_arr[] = array(
-                'quantity'   => $article['cart_quantity'],
-                'title'      => (isset($article['attributes']) && !empty($article['attributes'])) ? $article['name'].  ' - '.$article['attributes'] : $article['name'],
-                'artnr'      => $article['reference'],
-                'aprice'     => $roundedArticle * 100,
-                'taxrate'    => $taxrate,
-                'discount'   => 0,
-                'withouttax' => ($roundedArticle * $article['cart_quantity']) * 100,
-                'total_article' => $totalArticle
-
-            );
-            if (!isset($this->prepare_discount[$taxrate]))
-                $this->prepare_discount[$taxrate] = $totalArticle;
-            else
-                $this->prepare_discount[$taxrate] += $totalArticle;
-
-            $this->totals += $totalArticle;
-            $this->tax += round($totalArticle * ($taxrate / 100));
-
-        }
-
-        return $articles_arr;
-    }
-    public function prepareDiscounts()
-    {
-        if (!isset($this->coremodule) || !is_object($this->coremodule)) {
-            $this->coremodule = new BillmateGateway();
-        }
-        $details = $this->context->cart->getSummaryDetails(null, true);
-        $cartRules = $this->context->cart->getCartRules();
-        $title = '';
-        if (count($cartRules) > 0)
-        {
-            foreach ($cartRules as $cartRule)
-            {
-                $title .= $cartRule['name'].' ';
-            }
-        }
-        $totalTemp = $this->totals;
-        $discounts = array();
-        if (!empty($details['total_discounts']))
-        {
-            foreach ($this->prepare_discount as $key => $value)
-            {
-
-                $percent_discount = $value / ($totalTemp);
-
-                $discount_value = $percent_discount * $details['total_discounts'];
-                $discount_amount = round($discount_value / (1 + ($key / 100)),2);
-
-                $discounts[]    = array(
-                    'quantity'   => 1,
-                    'artnr'      => 'discount-'.$key,
-                    'title'      => $title.sprintf($this->coremodule->l('Discount %s%% VAT'), $key),
-                    'aprice'     => -($discount_amount * 100),
-                    'taxrate'    => $key,
-                    'discount'   => 0,
-                    'withouttax' => -$discount_amount * 100
-                );
-
-                $this->totals -= $discount_amount * 100;
-                $this->tax -= $discount_amount * ($key / 100) * 100;
-
-            }
-
-        }
-        if (!empty($details['gift_products']))
-        {
-            foreach ($details['gift_products'] as $gift)
-            {
-                $discount_amount = 0;
-                $taxrate        = 0;
-                foreach ($this->context->cart->getProducts() as $product)
-                {
-                    $taxrate        = ($product['price_wt'] == $product['price']) ? 0 : $product['rate'];
-                    $discount_amount = $product['price'];
-                }
-                $price          = $gift['price'] / $gift['cart_quantity'];
-                $discount_amount = round($discount_amount / $gift['cart_quantity'],2);
-                $total          = -($discount_amount * $gift['cart_quantity'] * 100);
-                $discounts[]    = array(
-                    'quantity'   => $gift['cart_quantity'],
-                    'artnr'      => $this->coremodule->l('Discount'),
-                    'title'      => $gift['name'],
-                    'aprice'     => $price - round($discount_amount * 100, 0),
-                    'taxrate'    => $taxrate,
-                    'discount'   => 0,
-                    'withouttax' => $total
-                );
-
-                $this->totals += $total;
-                $this->tax += $total * ($taxrate / 100);
-            }
-        }
-
-        return $discounts;
-    }
-    /**
-     * Returns the Cart Object with Totals for Handling, Shipping and Total
-     * @return array
-     */
-    public function prepareTotals()
-    {
-        $totals     = array();
-        $details    = $this->context->cart->getSummaryDetails(null, true);
-
-        $carrier    = $details['carrier'];
-        $order_total = $this->context->cart->getOrderTotal();
-        $notfree    = !(isset($details['free_ship']) && $details['free_ship'] == 1);
-
-        $total_shipping_cost  = round($this->context->cart->getTotalShippingCost(null, false),2);
-        $total_shipping_cost_inc_tax = 0;
-        $taxrate = 0;
-
-        if ($carrier->active && $notfree)
-        {
-            if (intval($carrier->id_reference) > 0) {
-                // Address saved in store
-                $carrier_obj = new Carrier($this->context->cart->id_carrier, $this->context->cart->id_lang);
-                $taxrate    = $carrier_obj->getTaxesRate(new Address($this->context->cart->{Configuration::get('PS_TAX_ADDRESS_TYPE')}));
-
-                // Try get shipping taxrate with no address
-                if ($taxrate == 0) {
-                    $selected_deliver_option_id = (int)current($this->context->cart->getDeliveryOption());
-                    $carrier = new Carrier($selected_deliver_option_id, $this->context->cart->id_lang);
-                    $taxrate = $carrier->getTaxesRate(Address::initialize(0));
-                }
-
-                // Maybe calculate shipping taxrate
-                $total_shipping_cost_inc_tax = 0;
-                if ($taxrate == 0) {
-                    $total_shipping_cost_inc_tax  = round($this->context->cart->getTotalShippingCost(null, true),2);
-                    if ($total_shipping_cost < $total_shipping_cost_inc_tax && $total_shipping_cost > 0 && $total_shipping_cost_inc_tax > 0) {
-                        $taxrate = round((($total_shipping_cost_inc_tax - $total_shipping_cost) / $total_shipping_cost) * 100);
-                    }
-                }
-
-                /**
-                 * Calculate shipping cost without tax when
-                 * - store might show prices with 0 decimals
-                 * - we have not calculated taxrate based on cost with and without tax
-                 */
-                if (
-                    $total_shipping_cost_inc_tax == 0
-                    && $taxrate > 0
-                    && $total_shipping_cost > 0
-                    && intval($total_shipping_cost) == $total_shipping_cost
-                ) {
-                    if ($total_shipping_cost_inc_tax == 0) {
-                        $total_shipping_cost_inc_tax  = round($this->context->cart->getTotalShippingCost(null, true) ,2);
-                    }
-                    if ($total_shipping_cost < $total_shipping_cost_inc_tax && $total_shipping_cost > 0 && $total_shipping_cost_inc_tax > 0) {
-                        $total_shipping_cost = ($total_shipping_cost_inc_tax / (1 + ($taxrate/100)));
-                        $total_shipping_cost = round($total_shipping_cost ,2);
-                    }
-                }
-            } elseif ($total_shipping_cost == 0) {
-                // Address not yet saved in store
-                $deliveryOptionData = $this->getDeliveryOptionData();
-                $total_shipping_cost = $deliveryOptionData['price_without_tax'];
-                $total_shipping_cost_inc_tax = $deliveryOptionData['price_with_tax'];
-
-                // Maybe calculate shipping taxrate
-                if ($taxrate == 0) {
-                    if ($total_shipping_cost < $total_shipping_cost_inc_tax && $total_shipping_cost > 0 && $total_shipping_cost_inc_tax > 0) {
-                        $taxrate = round((($total_shipping_cost_inc_tax - $total_shipping_cost) / $total_shipping_cost) * 100);
-                    }
-                }
-                $order_total += $total_shipping_cost_inc_tax;
-            }
-
-            $totals['Shipping'] = array(
-                'withouttax' => $total_shipping_cost * 100,
-                'taxrate'    => $taxrate
-            );
-            $this->totals += $total_shipping_cost * 100;
-            if($taxrate > 0) {
-                $this->tax += ($total_shipping_cost * ($taxrate / 100)) * 100;
-            }
-        }
-        if (Configuration::get('BINVOICE_FEE') > 0 && $this->method == 'invoice')
-        {
-            $fee           = Configuration::get('BINVOICE_FEE');
-            $invoice_fee_tax = Configuration::get('BINVOICE_FEE_TAX');
-
-            $tax                = new Tax($invoice_fee_tax);
-            $tax_calculator      = new TaxCalculator(array($tax));
-            $tax_rate            = $tax_calculator->getTotalRate();
-            $fee = Tools::convertPriceFull($fee,null,$this->context->currency);
-            $fee = round($fee,2);
-            $totals['Handling'] = array(
-                'withouttax' => $fee * 100,
-                'taxrate'    => $tax_rate
-            );
-            $this->handling_fee = $fee;
-            $this->handling_taxrate = $tax_rate;
-            $order_total += $fee * (1 + ($tax_rate / 100));
-            $this->totals += $fee * 100;
-            $this->tax += (($tax_rate / 100) * $fee) * 100;
-        }
-        if (Configuration::get('BINVOICESERVICE_FEE') > 0 && $this->method == 'invoiceservice')
-        {
-            $fee           = Configuration::get('BINVOICESERVICE_FEE');
-            $invoice_fee_tax = Configuration::get('BINVOICESERVICE_FEE_TAX');
-
-            $tax                = new Tax($invoice_fee_tax);
-            $tax_calculator      = new TaxCalculator(array($tax));
-            $tax_rate            = $tax_calculator->getTotalRate();
-            $fee = Tools::convertPriceFull($fee,null,$this->context->currency);
-            $fee = round($fee,2);
-            $totals['Handling'] = array(
-                'withouttax' => $fee * 100,
-                'taxrate'    => $tax_rate
-            );
-            $this->handling_fee = $fee;
-            $this->handling_taxrate = $tax_rate;
-            $order_total += $fee * (1 + ($tax_rate / 100));
-            $this->totals += $fee * 100;
-            $this->tax += (($tax_rate / 100) * $fee) * 100;
-        }
-
-        $rounding         = round($order_total * 100) - round($this->tax + $this->totals);
-        $totals['Total']  = array(
-            'withouttax' => round($this->totals),
-            'tax'        => round($this->tax),
-            'rounding'   => round($rounding),
-            'withtax'    => round($this->totals + $this->tax + $rounding)
-        );
-        $this->paid_amount = $totals['Total']['withtax'];
-
-        return $totals;
-    }
-
-    /**
-     * A method for checkoutPreparation
-     * @return array Billmate Request
-     */
-    public function prepareCheckout($method = null)
-    {
-        $payment_data                = array();
-        $cms = new CMS(
-            (int) (Configuration::get('PS_CONDITIONS_CMS_ID')),
-            (int) ($this->context->cookie->id_lang)
-        );
-
-        $link_conditions = $this->context->link->getCMSLink($cms, $cms->link_rewrite, true);
-        $termsPage = $link_conditions;
-        $payment_data['PaymentData'] = array(
-            'method'        => 93,
-            'currency'      => Tools::strtoupper($this->context->currency->iso_code),
-            'language'      => Tools::strtolower($this->context->language->iso_code),
-            'country'       => Tools::strtoupper($this->context->country->iso_code),
-            'orderid'       => Tools::substr($this->context->cart->id.'-'.time(), 0, 10),
-            'logo' 			=> (Configuration::get('BILLMATE_LOGO')) ? Configuration::get('BILLMATE_LOGO') : '',
-
-            'accepturl'    => $this->context->link->getModuleLink('billmategateway', 'accept',      array('method' => 'checkout', 'checkout' => true), true),
-            'cancelurl'    => $this->context->link->getModuleLink('billmategateway', 'cancel',      array('method' => 'checkout', 'checkout' => true), true),
-            'callbackurl'  => $this->context->link->getModuleLink('billmategateway', 'callback',    array('method' => 'checkout', 'checkout' => true), true),
-            'returnmethod' => (array_key_exists('HTTPS', $_SERVER) && $_SERVER['HTTPS'] == "on") ?'POST' : 'GET'
-        );
-
-        $payment_data['CheckoutData'] = array(
-            'terms'             => $termsPage,
-            'windowmode'        => 'iframe',
-            'sendreciept'       => 'yes',
-            'redirectOnSuccess' => 'true'
-        );
-
-        // When available Add store Privacy Policy page
-        $config_billmate_checkout_privacy_policy_page_id = (int)Configuration::get('BILLMATE_CHECKOUT_PRIVACY_POLICY');
-        if ($config_billmate_checkout_privacy_policy_page_id > 0) {
-            $cms = new CMS(
-                (int) ($config_billmate_checkout_privacy_policy_page_id),
-                (int) ($this->context->cookie->id_lang)
-            );
-            $privacy_policy_url = $this->context->link->getCMSLink($cms, $cms->link_rewrite, true);
-            if ($privacy_policy_url != '') {
-                $payment_data['CheckoutData']['privacyPolicy'] = $privacy_policy_url;
-            }
-        }
-
-        return $payment_data;
-    }
-
-    public function getmoduleId($method)
-    {
-        $id2name = array();
-        $sql = 'SELECT `id_module`, `name` FROM `'._DB_PREFIX_.'module`';
-        if ($results = Db::getInstance()->executeS($sql)) {
-            foreach ($results as $row) {
-                $id2name[$row['name']] = $row['id_module'];
-            }
-        }
-        return $id2name[$method];
     }
 }

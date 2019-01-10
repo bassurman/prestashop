@@ -47,10 +47,16 @@ class BaseBmFront extends ModuleFrontControllerCore
      */
     protected $coremodule;
 
+    /**
+     * @var BMDataCollector
+     */
+    protected $BMDataCollector;
+
     public function __construct()
     {
         $this->configHelper = new BmConfigHelper();
         $this->method = Tools::getValue('method');
+        $this->BMDataCollector = new BMDataCollector();
         parent::__construct();
     }
 
@@ -88,5 +94,13 @@ class BaseBmFront extends ModuleFrontControllerCore
     protected function convertToUtf($value)
     {
         return mb_convert_encoding($value,'UTF-8','auto');
+    }
+
+    /**
+     * @return BMDataCollector
+     */
+    public function getBMDataCollector()
+    {
+        return $this->BMDataCollector;
     }
 }
