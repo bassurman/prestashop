@@ -442,9 +442,7 @@ class BillmategatewayAcceptModuleFrontController extends BaseBmFront
             );
             $this->billmateConnection->updatePayment($values);
 
-            if ($this->paymentMethod->authorization_method == 'sale' && $this->method == 'cardpay')
-            {
-
+            if ($this->paymentMethod->authorization_method == 'sale' && $this->method == 'cardpay') {
                 $values['PaymentData'] = array(
                     'number' => $data['number']
                 );
@@ -464,8 +462,6 @@ class BillmategatewayAcceptModuleFrontController extends BaseBmFront
                 Tools::redirectLink($url);
                 die;
             } else {
-
-
                 Tools::redirectLink(__PS_BASE_URI__ . 'order-confirmation.php?key=' . $customer->secure_key .
                     '&id_cart=' . (int)$this->context->cart->id . '&id_module=' . (int)$this->getmoduleId('billmate' . $this->method) .
                     '&id_order=' . (int)$this->paymentMethod->currentOrder);
@@ -579,7 +575,6 @@ class BillmategatewayAcceptModuleFrontController extends BaseBmFront
             }
             $cartSaveResult = $this->context->cart->save();
 
-            // Carrier has changed, so we check if the cart rules still apply
             CartRule::autoRemoveFromCart($this->context);
             CartRule::autoAddToCart($this->context);
             $result['success'] = true;

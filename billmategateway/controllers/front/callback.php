@@ -59,7 +59,6 @@ class BillmategatewayCallbackModuleFrontController extends BaseBmFront
 
         $displayName = $this->paymentMethod->displayName;
         if ($this->method == 'checkout') {
-            /** When checkout, check for selected payment method found in $paymentInfo.PaymentData.method_name */
             if (isset($paymentInfo['PaymentData']['method_name']) AND $paymentInfo['PaymentData']['method_name'] != '') {
                 $displayName = $displayName.' ('.$paymentInfo['PaymentData']['method_name'].')';
             }
@@ -235,8 +234,6 @@ class BillmategatewayCallbackModuleFrontController extends BaseBmFront
                         && $customer['Shipping']['city'] != ''
                 ) {
                     $address = $customer['Shipping'];
-                    file_put_contents($logfile, 'shippingAddress:'.print_r($address,true),FILE_APPEND);
-                    file_put_contents($logfile, 'customerAddress:'.print_r($customer_addresses,true),FILE_APPEND);
 
                     $matched_address_id = false;
                     foreach ($customer_addresses as $customer_address) {

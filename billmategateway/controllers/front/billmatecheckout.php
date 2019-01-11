@@ -907,7 +907,6 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
         $billmateDataCollector->setPaymentMethod($this->method);
         $requestData = $billmateDataCollector->getRequestData();
 
-
         $result = $billmate->initCheckout($requestData);
         if(!isset($result['code'])){
             $hash = $this->getHashFromUrl($result['url']);
