@@ -85,11 +85,8 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
                     Common::matchstr(Country::getIsoById($customer_address['id_country']), $address['country']))
 
                     $matched_address_id = $customer_address['id_address'];
-            }
-            else
-            {
-                foreach ($customer_address as $c_address)
-                {
+            } else {
+                foreach ($customer_address as $c_address) {
                     $billing  = new Address($c_address['id_address']);
 
                     $user_bill = $billing->firstname.' '.$billing->lastname.' '.$billing->company;
@@ -105,10 +102,8 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
                         $matched_address_id = $c_address['id_address'];
                 }
             }
-
         }
-        if (!$matched_address_id)
-        {
+        if (!$matched_address_id) {
             $addressnew              = new Address();
             $addressnew->id_customer = (int)$this->context->cart->id_customer;
             $addressnew->firstname = !empty($address['firstname']) ? $address['firstname'] : $billing->firstname;
@@ -145,10 +140,8 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
             file_put_contents($logfile, 'shippingAddress:'.print_r($address,true),FILE_APPEND);
             file_put_contents($logfile, 'customerAddress:'.print_r($customer_addresses,true),FILE_APPEND);
             $matched_address_id = false;
-            foreach ($customer_addresses as $customer_address)
-            {
-                if (isset($customer_address['address1']))
-                {
+            foreach ($customer_addresses as $customer_address) {
+                if (isset($customer_address['address1'])) {
                     $billing  = new Address($customer_address['id_address']);
                     $user_bill = $billing->firstname.' '.$billing->lastname.' '.$billing->company;
                     $company = isset($address['company']) ? $address['company'] : '';
@@ -158,11 +151,8 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
                         Common::matchstr($customer_address['city'], $address['city']) &&
                         Common::matchstr(Country::getIsoById($customer_address['id_country']), isset($address['country']) ? $address['country'] : $country))
                         $matched_address_id = $customer_address['id_address'];
-                }
-                else
-                {
-                    foreach ($customer_address as $c_address)
-                    {
+                } else {
+                    foreach ($customer_address as $c_address) {
                         $billing  = new Address($c_address['id_address']);
                         $user_bill = $billing->firstname.' '.$billing->lastname.' '.$billing->company;
                         $company = isset($address['company']) ? $address['company'] : '';
@@ -177,7 +167,7 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
                 }
             }
 
-            if(!$matched_address_id) {
+            if (!$matched_address_id) {
                 $address = $customer['Shipping'];
                 $addressshipping = new Address();
                 $addressshipping->id_customer = (int)$this->context->cart->id_customer;
@@ -222,7 +212,8 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
         }
     }
 
-    public function postProcess() {
+    public function postProcess()
+    {
         $response = array();
 
         if (CartRule::isFeatureActive()) {
@@ -340,7 +331,8 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
         }
     }
 
-    public function actionSetShipping() {
+    public function actionSetShipping()
+    {
         $result = array();
         if (Tools::getIsset('delivery_option')) {
             $validated = false;
@@ -698,22 +690,6 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
         return true;
     }
 
-    private function getCarriers()
-    {
-        if (intval($this->context->cart->id_customer) > 0) {
-            $carriers = $this->context->cart->simulateCarriersOutput();
-        } else {
-            // Cart have no customer
-            $country_id = Country::getByIso('SE');
-            $country = new Country($country_id);
-            $id_zone = $country->id_zone;
-            $ps_guest_group = Configuration::get('PS_GUEST_GROUP');
-            $groups = array($ps_guest_group);
-            $carriers = Carrier::getCarriersForOrder($id_zone, $groups);
-        }
-        return $carriers;
-    }
-
     /**
      * @return int|mixed|null|string
      */
@@ -750,7 +726,7 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
             $link_conditions .= '&content_only=1';
         }
 
-        $carriers = $this->getCarriers();
+        $carriers = $this->getBMDataCollector()->getCarriers();
 
         $wrapping_fees = $this->context->cart->getGiftWrappingPrice(false);
         $wrapping_fees_tax_inc = $this->context->cart->getGiftWrappingPrice();
@@ -880,6 +856,9 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
         }
     }
 
+    /**
+     * @return string
+     */
     public function getCheckout()
     {
         $billmate = $this->getBillmate();
@@ -927,6 +906,7 @@ class BillmategatewayBillmatecheckoutModuleFrontController extends BaseBmFront
         $billmateDataCollector->setRequestMethod(self::REQUEST_METHOD);
         $billmateDataCollector->setPaymentMethod($this->method);
         $requestData = $billmateDataCollector->getRequestData();
+
 
         $result = $billmate->initCheckout($requestData);
         if(!isset($result['code'])){

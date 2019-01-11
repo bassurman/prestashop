@@ -72,9 +72,13 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
             case 'invoice':
             case 'partpay':
             case 'invoiceservice':
-                if(Tools::getIsset('invoice_address') && class_exists('BillmateMethodInvoiceservice')) {
+                if(
+                    Tools::getIsset('invoice_address') &&
+                    class_exists('BillmateMethodInvoiceservice')
+                ) {
                     $this->invoiceservice = true;
                 }
+
                 if(Tools::getValue('geturl') == 'yes') {
                     $this->checkAddress();
                 }
@@ -86,24 +90,10 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
                 break;
         }
 
-        // Populate Data with the Customer Data and Cart stuff
         $requestData['Customer'] = $this->prepareCustomer();
-        $requestData['Articles'] = $this->prepareArticles();
-        $discounts = $this->prepareDiscounts();
+        $cartTotals = $this->getBMDataCollector()->collectCartTotals();
 
-        if (count($discounts) > 0) {
-            foreach ($discounts as $discount) {
-                array_push($requestData['Articles'], $discount);
-            }
-        }
-        $requestData['Cart'] = $this->prepareTotals();
-
-        if ($this->configHelper->isEnabledBMMessage()) {
-            $cartMessages = $this->getCartMessages();
-            if ($cartMessages) {
-                $requestData['Articles'] = array_merge($requestData['Articles'], $cartMessages);
-            }
-        }
+        $requestData = array_merge($requestData, $cartTotals);
         return $requestData;
     }
 
@@ -146,244 +136,6 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
         return $customer;
     }
 
-    /**
-     * Returns the Articles object and sets the totals of the Articles
-     * @return array
-     */
-    public function prepareArticles()
-    {
-        $articles_arr = array();
-        $articles    = $this->context->cart->getProducts();
-        foreach ($articles as $article) {
-            $taxrate = ($article['price_wt'] == $article['price']) ? 0 : $article['rate'];
-            $roundedArticle = round($article['price'], 2);
-            $totalArticle = ($roundedArticle * $article['cart_quantity']) * 100;
-            $articles_arr[] = array(
-                'quantity'   => $article['cart_quantity'],
-                'title'      => (isset($article['attributes']) && !empty($article['attributes'])) ? $article['name'].  ' - '.$article['attributes'] : $article['name'],
-                'artnr'      => $article['reference'],
-                'aprice'     => $roundedArticle * 100,
-                'taxrate'    => $taxrate,
-                'discount'   => 0,
-                'withouttax' => ($roundedArticle * $article['cart_quantity']) * 100
-
-            );
-            if (!isset($this->prepare_discount[$taxrate])) {
-                $this->prepare_discount[$taxrate] = $totalArticle;
-            } else {
-                $this->prepare_discount[$taxrate] += $totalArticle;
-            }
-
-            $this->totals += $totalArticle;
-            $this->tax += round($totalArticle * ($taxrate / 100));
-
-        }
-
-        return $articles_arr;
-    }
-
-    /**
-     * @return array
-     */
-    public function prepareDiscounts()
-    {
-        $details = $this->context->cart->getSummaryDetails(null, true);
-        $cartRules = $this->context->cart->getCartRules();
-        $title = '';
-        if (count($cartRules) > 0) {
-            foreach ($cartRules as $cartRule) {
-                $title .= $cartRule['name'].' ';
-            }
-        }
-
-        $totalTemp = $this->totals;
-        $discounts = array();
-        if (!empty($details['total_discounts'])) {
-            foreach ($this->prepare_discount as $key => $value) {
-
-                $percent_discount = $value / ($totalTemp);
-
-                $discount_value = $percent_discount * $details['total_discounts'];
-                $discount_amount = round($discount_value / (1 + ($key / 100)),2);
-
-                $discounts[]    = array(
-                    'quantity'   => 1,
-                    'artnr'      => 'discount-'.$key,
-                    'title'      => $title.sprintf($this->l('Discount %s%% VAT','billmategateway'), $key),
-                    'aprice'     => -($discount_amount * 100),
-                    'taxrate'    => $key,
-                    'discount'   => 0,
-                    'withouttax' => -$discount_amount * 100
-                );
-
-                $this->totals -= $discount_amount * 100;
-                $this->tax -= $discount_amount * ($key / 100) * 100;
-
-            }
-
-        }
-
-        if (!empty($details['gift_products'])) {
-            foreach ($details['gift_products'] as $gift) {
-                $discount_amount = 0;
-                $taxrate        = 0;
-                foreach ($this->context->cart->getProducts() as $product) {
-                    $taxrate        = ($product['price_wt'] == $product['price']) ? 0 : $product['rate'];
-                    $discount_amount = $product['price'];
-                }
-                $price          = $gift['price'] / $gift['cart_quantity'];
-                $discount_amount = round($discount_amount / $gift['cart_quantity'],2);
-                $total          = -($discount_amount * $gift['cart_quantity'] * 100);
-                $discounts[]    = array(
-                    'quantity'   => $gift['cart_quantity'],
-                    'artnr'      => $this->l('Discount', 'billmategateway'),
-                    'title'      => $gift['name'],
-                    'aprice'     => $price - round($discount_amount * 100, 0),
-                    'taxrate'    => $taxrate,
-                    'discount'   => 0,
-                    'withouttax' => $total
-                );
-
-                $this->totals += $total;
-                $this->tax += $total * ($taxrate / 100);
-            }
-        }
-
-        return $discounts;
-    }
-
-    /**
-     * Returns the Cart Object with Totals for Handling, Shipping and Total
-     * @return array
-     */
-    public function prepareTotals()
-    {
-        $totals     = array();
-        $order_total = $this->context->cart->getOrderTotal();
-
-        /** Shipping */
-        $shipping = $this->getCartShipping();
-        if ($shipping['withouttax'] > 0) {
-            $totals['Shipping'] = array(
-                'withouttax'    => $shipping['withouttax'],
-                'taxrate'       => $shipping['taxrate']
-            );
-
-            $this->totals       += $shipping['withouttax'];
-            $this->tax          += $shipping['tax'];
-        }
-
-        if (Configuration::get('BINVOICE_FEE') > 0 && $this->method == 'invoice') {
-            $fee           = Configuration::get('BINVOICE_FEE');
-            $invoice_fee_tax = Configuration::get('BINVOICE_FEE_TAX');
-
-            $tax                = new Tax($invoice_fee_tax);
-            $tax_calculator      = new TaxCalculator(array($tax));
-            $tax_rate            = $tax_calculator->getTotalRate();
-            $fee = Tools::convertPriceFull($fee,null,$this->context->currency);
-            $fee = round($fee,2);
-            $totals['Handling'] = array(
-                'withouttax' => $fee * 100,
-                'taxrate'    => $tax_rate
-            );
-            $this->handling_fee = $fee;
-            $this->handling_taxrate = $tax_rate;
-            $order_total += $fee * (1 + ($tax_rate / 100));
-            $this->totals += $fee * 100;
-            $this->tax += (($tax_rate / 100) * $fee) * 100;
-        }
-
-        if (Configuration::get('BINVOICESERVICE_FEE') > 0 && $this->method == 'invoiceservice') {
-            $fee           = Configuration::get('BINVOICESERVICE_FEE');
-            $invoice_fee_tax = Configuration::get('BINVOICESERVICE_FEE_TAX');
-
-            $tax                = new Tax($invoice_fee_tax);
-            $tax_calculator      = new TaxCalculator(array($tax));
-            $tax_rate            = $tax_calculator->getTotalRate();
-            $fee = Tools::convertPriceFull($fee,null,$this->context->currency);
-            $fee = round($fee,2);
-            $totals['Handling'] = array(
-                'withouttax' => $fee * 100,
-                'taxrate'    => $tax_rate
-            );
-            $this->handling_fee = $fee;
-            $this->handling_taxrate = $tax_rate;
-            $order_total += $fee * (1 + ($tax_rate / 100));
-            $this->totals += $fee * 100;
-            $this->tax += (($tax_rate / 100) * $fee) * 100;
-        }
-
-        $rounding         = round($order_total * 100) - round($this->tax + $this->totals);
-        $totals['Total']  = array(
-            'withouttax' => round($this->totals),
-            'tax'        => round($this->tax),
-            'rounding'   => round($rounding),
-            'withtax'    => round($this->totals + $this->tax + $rounding)
-        );
-        $this->paid_amount = $totals['Total']['withtax'];
-
-        return $totals;
-    }
-
-    /**
-     * @return array with withouttax, tax, taxrate
-     */
-    public function getCartShipping()
-    {
-        $details    = $this->context->cart->getSummaryDetails(null, true);
-        $carrier    = $details['carrier'];
-        $notfree    = !(isset($details['free_ship']) && $details['free_ship'] == 1);
-
-        $total_shipping_cost  = round($this->context->cart->getTotalShippingCost(null, false),2);
-
-        $withouttax     = 0;
-        $taxrate        = 0;
-        $tax            = 0;
-
-        if (    method_exists($this->context->cart, 'isMultiAddressDelivery')
-                && $this->context->cart->isMultiAddressDelivery() == true
-        ) {
-            /** Multiple shipping addresses, get highest shipping fee taxrate */
-            $_cart_carrier_ids = $this->context->cart->getDeliveryOption();
-            foreach ($_cart_carrier_ids AS $_address_id => $_cart_carrier_id) {
-                $_carrier = new Carrier($_cart_carrier_id, $this->context->cart->id_lang);
-                if ($_carrier->id > 0) {
-                    $_address = new Address($_address_id);
-                    $_taxrate = $_carrier->getTaxesRate($_address);
-                    $taxrate = ($_taxrate >= $taxrate) ? $_taxrate : $taxrate;
-                }
-            }
-        } else {
-            /** Single shipping address */
-            if ($carrier->active && $notfree) {
-                $carrier_obj    = new Carrier($this->context->cart->id_carrier, $this->context->cart->id_lang);
-                $_address       = new Address($this->context->cart->{Configuration::get('PS_TAX_ADDRESS_TYPE')});
-                $taxrate        = $carrier_obj->getTaxesRate($_address);
-            }
-        }
-
-        // Try get shipping taxrate one more time if not already found
-        if ($taxrate == 0) {
-            $total_shipping_cost_with_tax  = round($this->context->cart->getTotalShippingCost(null, true),2);
-            if ($total_shipping_cost_with_tax > $total_shipping_cost) {
-                $tax = $total_shipping_cost_with_tax - $total_shipping_cost;
-                $taxrate = round(($tax / $total_shipping_cost) * 100);
-            }
-        }
-
-        if ($total_shipping_cost > 0) {
-            $withouttax = $total_shipping_cost * 100;
-            if ($taxrate > 0) {
-                $tax = ($withouttax * ($taxrate / 100));
-            }
-        }
-
-        return array(
-            'withouttax'    => $withouttax,
-            'taxrate'       => $taxrate,
-            'tax'           => $tax
-        );
-    }
 
     /**
      * Check if the address is matched with our Api
@@ -562,14 +314,15 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
                 break;
             case 'invoice':
                 $methodValue = $invoiceMethod;
-                if ($this->invoiceservice)
+                if ($this->invoiceservice) {
                     $methodValue = 2;
+                }
                 break;
             case 'partpay':
                 $methodValue = 4;
                 break;
-
         }
+
         $payment_data['PaymentData'] = array(
             'method'        => $methodValue,
             'paymentplanid' => ($method == 'partpay') ? Tools::getValue('paymentAccount') : '',
@@ -804,38 +557,5 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
         }
 
         return $address;
-    }
-
-    /**
-     * @return array
-     */
-    protected function getCartMessages()
-    {
-        $messages = [];
-        $cartMessage = Message::getMessageByCartId($this->context->cart->id);
-
-        if (is_array($cartMessage) && isset($cartMessage['message']) && strlen($cartMessage['message']) > 0) {
-            $messages[] = array(
-                'quantity'   => 0,
-                'title'      => ' ',
-                'artnr'      => '--freetext--',
-                'aprice'     => 0,
-                'taxrate'    => 0,
-                'discount'   => 0,
-                'withouttax' => 0
-
-            );
-            $messages[] = array(
-                'quantity'   => 0,
-                'title'      => html_entity_decode($cartMessage['message']),
-                'artnr'      => '--freetext--',
-                'aprice'     => 0,
-                'taxrate'    => 0,
-                'discount'   => 0,
-                'withouttax' => 0
-
-            );
-        }
-        return $messages;
     }
 }

@@ -81,20 +81,36 @@ class BMDataCollector
         } else {
             $this->prepareCheckout();
         }
+        $this->collectCartTotals();
+        return $this->requestData;
+    }
+
+    /**
+     * @return array
+     */
+    public function collectCartTotals()
+    {
         $this->prepareArticles();
         $this->prepareDiscounts();
         $this->prepareTotals();
         return $this->requestData;
     }
 
+    /**
+     * @return $this
+     */
     protected function prepareUpdCheckout()
     {
         $this->requestData['PaymentData'] = [
             'currency'      => Tools::strtoupper($this->context->currency->iso_code),
             'number' => ''
         ];
+        return $this;
     }
 
+    /**
+     * @return $this
+     */
     protected function prepareCheckout()
     {
         $this->requestData['PaymentData'] = array(
@@ -121,8 +137,6 @@ class BMDataCollector
         if ($privacyUrl) {
             $this->requestData['CheckoutData']['privacyPolicy'] = $privacyUrl;
         }
-
-
 
         return $this;
     }
@@ -163,6 +177,42 @@ class BMDataCollector
             $this->tax += round($totalArticle * ($taxrate / 100));
         }
 
+        //$this->prepareCartMessages();
+
+        return $this;
+    }
+
+    /**
+     * @return array
+     */
+    protected function prepareCartMessages()
+    {
+        if ($this->configHelper->isEnabledBMMessage()) {
+            $cartMessage = Message::getMessageByCartId($this->context->cart->id);
+
+            if (is_array($cartMessage) && isset($cartMessage['message']) && strlen($cartMessage['message']) > 0) {
+                $this->requestData['Articles'][] = array(
+                    'quantity'   => 0,
+                    'title'      => ' ',
+                    'artnr'      => '--freetext--',
+                    'aprice'     => 0,
+                    'taxrate'    => 0,
+                    'discount'   => 0,
+                    'withouttax' => 0
+
+                );
+                $this->requestData['Articles'][] = array(
+                    'quantity'   => 0,
+                    'title'      => html_entity_decode($cartMessage['message']),
+                    'artnr'      => '--freetext--',
+                    'aprice'     => 0,
+                    'taxrate'    => 0,
+                    'discount'   => 0,
+                    'withouttax' => 0
+
+                );
+            }
+        }
         return $this;
     }
 
@@ -232,6 +282,9 @@ class BMDataCollector
         return $this;
     }
 
+    /**
+     * @return $this
+     */
     public function prepareTotals()
     {
         $order_total = $this->context->cart->getOrderTotal();
@@ -249,7 +302,6 @@ class BMDataCollector
                 $this->tax += $this->toCents($totalShippingCost * ($taxrate / 100));
                 $order_total += $totalShippingCost;
             }
-
         }
 
         $paymentMethod = $this->getPaymentMethod();
@@ -297,6 +349,9 @@ class BMDataCollector
         return $this;
     }
 
+    /**
+     * @return array
+     */
     protected function getShippingCostData()
     {
         $details    = $this->getCartDetails();
@@ -521,6 +576,21 @@ class BMDataCollector
             );
         }
         return $delivery_option_list_from_carriers;
+    }
+
+    public function getCarriers()
+    {
+        if (intval($this->context->cart->id_customer) > 0) {
+            $carriers = $this->context->cart->simulateCarriersOutput();
+        } else {
+            $country_id = Country::getByIso('SE');
+            $country = new Country($country_id);
+            $id_zone = $country->id_zone;
+            $ps_guest_group = Configuration::get('PS_GUEST_GROUP');
+            $groups = array($ps_guest_group);
+            $carriers = Carrier::getCarriersForOrder($id_zone, $groups);
+        }
+        return $carriers;
     }
 
     /**
