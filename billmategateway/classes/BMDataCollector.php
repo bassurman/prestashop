@@ -177,7 +177,7 @@ class BMDataCollector
             $this->tax += round($totalArticle * ($taxrate / 100));
         }
 
-        //$this->prepareCartMessages();
+        $this->prepareCartMessages();
 
         return $this;
     }

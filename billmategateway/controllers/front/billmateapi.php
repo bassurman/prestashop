@@ -20,17 +20,11 @@
 
 class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
 {
-
-    protected $method;
-    
-    public $module;
     /**
-     * The total sum for costs
-     * @var $totals
+     * @var int
      */
-    protected $totals = 0;
-    /** @var int $paid_amount for use with Billmate Invoice to sett correct amount */
     protected $paid_amount = 0;
+
     /**
      * The total tax amount
      * @var $tax
@@ -38,12 +32,12 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
     protected $tax = 0;
 
     /** @var array with the format array('taxrate' => 'totalamount') */
-    protected $prepare_discount = array();
-    /** @var  pno | The personal number if invoice or Partpay */
+
     protected $pno;
-    protected $billmate;
-    protected $handling_fee = false;
-    protected $handling_taxrate = false;
+
+    /**
+     * @var bool
+     */
     protected $invoiceservice = false;
 
     public function postProcess()
@@ -59,7 +53,6 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
         $result = $this->billmateConnection->addPayment($requestData);
         $this->sendResponse($result);
     }
-
 
     /**
      * @return array
@@ -92,6 +85,7 @@ class BillmategatewayBillmateapiModuleFrontController extends BaseBmFront
 
         $requestData['Customer'] = $this->prepareCustomer();
         $cartTotals = $this->getBMDataCollector()->collectCartTotals();
+        $this->paid_amount = $cartTotals['Cart']['Total']['withtax'];
 
         $requestData = array_merge($requestData, $cartTotals);
         return $requestData;
