@@ -439,4 +439,44 @@ class BmConfigHelper extends Helper
 
         return $this;
     }
+
+    /**
+     * @return string
+     */
+    public function getBpartOrderStatus()
+    {
+        return Configuration::get('BPARTPAY_ORDER_STATUS');
+    }
+
+    /**
+     * @return string
+     */
+    public function getBInvoiceOrderStatus()
+    {
+        return Configuration::get('BINVOICE_ORDER_STATUS');
+    }
+
+    /**
+     * @return string
+     */
+    public function getBInvoiceServiceOrderStatus()
+    {
+        return Configuration::get('BINVOICESERVICE_ORDER_STATUS');
+    }
+
+    /**
+     * @return string
+     */
+    public function getBCheckoutOrderStatus()
+    {
+        return Configuration::get('BILLMATE_CHECKOUT_ORDER_STATUS');
+    }
+
+    /**
+     * @return string
+     */
+    public function getBPaymentPendingStatus()
+    {
+        return Configuration::get('BILLMATE_PAYMENT_PENDING');
+    }
 }

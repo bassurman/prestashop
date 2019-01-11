@@ -22,6 +22,9 @@ class BaseBmFront extends ModuleFrontControllerCore
 {
 
     const P_CLASS_PREFIX = 'BillmateMethod';
+
+    const LOGFILE_NAME = 'Billmate.log';
+
     /**
      * @var BmConfigHelper
      */
@@ -102,5 +105,13 @@ class BaseBmFront extends ModuleFrontControllerCore
     public function getBMDataCollector()
     {
         return $this->BMDataCollector;
+    }
+
+    /**
+     * @return string
+     */
+    public function getLogfileName()
+    {
+        return _PS_CACHE_DIR_ . self::LOGFILE_NAME;
     }
 }
