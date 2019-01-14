@@ -49,23 +49,30 @@ require_once(_PS_MODULE_DIR_.'billmategateway/billmategateway.php');
 		public function getPaymentInfo($cart)
 		{
 			pClasses::checkPclasses($this->billmate_merchant_id,$this->billmate_secret,'se',Language::getIsoById($cart->id_lang),'SEK');
-			if (!pClasses::hasPclasses(Language::getIsoById($cart->id_lang)) || Configuration::get('BPARTPAY_ENABLED') == 0)
-				return false;
+			if (!pClasses::hasPclasses(Language::getIsoById($cart->id_lang)) || Configuration::get('BPARTPAY_ENABLED') == 0) {
+                return false;
+            }
 
-			if ($this->min_value > $this->context->cart->getOrderTotal())
-				return false;
-			if ($this->max_value < $this->context->cart->getOrderTotal())
-				return false;
-			if (!in_array(strtoupper($this->context->currency->iso_code), $this->allowed_currencies))
-				return false;
+			if ($this->min_value > $this->context->cart->getOrderTotal()) {
+                return false;
+            }
 
-			if (!in_array(Tools::strtolower($this->context->country->iso_code), $this->limited_countries))
-				return false;
+			if ($this->max_value < $this->context->cart->getOrderTotal()) {
+                return false;
+            }
 
+			if (!in_array(strtoupper($this->context->currency->iso_code), $this->allowed_currencies)) {
+                return false;
+            }
+
+			if (!in_array(Tools::strtolower($this->context->country->iso_code), $this->limited_countries)) {
+                return false;
+            }
 
 			$pclasses = $this->getPclasses($cart);
-			if(empty($pclasses))
-				return false;
+			if (empty($pclasses)) {
+                return false;
+            }
 
 			return array(
 				'sort_order' => $this->sort_order,
@@ -86,8 +93,9 @@ require_once(_PS_MODULE_DIR_.'billmategateway/billmategateway.php');
 			$statuses       = OrderState::getOrderStates((int)$this->context->language->id);
 			$currency       = Currency::getDefaultCurrency();
 			$statuses_array = array();
-			foreach ($statuses as $status)
-				$statuses_array[$status['id_order_state']] = $status['name'];
+			foreach ($statuses as $status) {
+                $statuses_array[$status['id_order_state']] = $status['name'];
+            }
 
 			$settings['activated'] = array(
 				'name'     => 'partpayActivated',
@@ -141,8 +149,11 @@ require_once(_PS_MODULE_DIR_.'billmategateway/billmategateway.php');
 				'label'    => $this->module->l('Sort Order','partpay'),
 				'desc'     => $this->module->l(''),
 			);
-            if(Configuration::get('BILLMATE_ID'))
-			    $pclasses = new pClasses(Configuration::get('BILLMATE_ID'));
+
+            if(Configuration::get('BILLMATE_ID')) {
+                $pclasses = new pClasses(Configuration::get('BILLMATE_ID'));
+            }
+
 			$settings['paymentplans'] = array(
 				'name' => 'paymentplans',
 				'label' => $this->module->l('Paymentplans','partpay'),

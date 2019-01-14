@@ -41,11 +41,11 @@ require_once(_PS_MODULE_DIR_.'billmategateway/billmategateway.php');
 			$this->icon                 = file_exists(_PS_MODULE_DIR_.'billmategateway/views/img/'.Tools::strtolower($this->context->language->iso_code).'/bank.png') ? 'billmategateway/views/img/'.Tools::strtolower($this->context->language->iso_code).'/bank.png' : 'billmategateway/views/img/en/bank.png';
 		}
 
-
-
-		/**
-		 * Returns Payment info for appending in payment methods list
-		 */
+        /**
+         * @param $cart CartCore
+         *
+         * @return array|bool
+         */
 		public function getPaymentInfo($cart)
 		{
 			if (Configuration::get('BBANKPAY_ENABLED') == 0)

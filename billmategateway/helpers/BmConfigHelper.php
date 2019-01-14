@@ -109,11 +109,9 @@ class BmConfigHelper extends Helper
 
     public function getAvailableMethods()
     {
-        if (is_null($this->availMethods))
-        {
+        if (is_null($this->availMethods)) {
             $bmConnection = $this->getBillmateConnection();
-            if ($bmConnection)
-            {
+            if ($bmConnection) {
                 $result          = $bmConnection->getAccountinfo(array('time' => time()));
                 $mapCodeToMethod = $this->getPaymentMethodsMap();
                 $paymentOptions  = array();
@@ -121,29 +119,22 @@ class BmConfigHelper extends Helper
                 $logfile = _PS_CACHE_DIR_ . 'Billmate.log';
                 file_put_contents($logfile, print_r($result['paymentoptions'], true), FILE_APPEND);
 
-                foreach ($result['paymentoptions'] as $option)
-                {
-                    /**
-                     * When invoice is unavailable and invoice service is available, use invoice service as invoice
-                     */
-                    if ($option['method'] == '2' && !isset($paymentOptions['1']))
-                    {
+                foreach ($result['paymentoptions'] as $option) {
+                    if ($option['method'] == '2' && !isset($paymentOptions['1'])) {
                         $mapCodeToMethod['2'] = 'invoice';
                     }
 
-                    if (isset($mapCodeToMethod[$option['method']]) &&
-                        !in_array($mapCodeToMethod[$option['method']], $paymentOptions))
-                    {
+                    if (
+                        isset($mapCodeToMethod[$option['method']]) &&
+                        !in_array($mapCodeToMethod[$option['method']], $paymentOptions)
+                    ) {
                         $paymentOptions[$option['method']] = $mapCodeToMethod[$option['method']];
-                    }
-                    else
-                    {
+                    } else {
                         continue;
                     }
                 }
-                // Add checkout as payment option if available
-                if (isset($result['checkout']) && $result['checkout'])
-                {
+
+                if (isset($result['checkout']) && $result['checkout']) {
                     $paymentOptions['checkout'] = 'checkout';
                 }
 
@@ -160,9 +151,7 @@ class BmConfigHelper extends Helper
                 Configuration::updateValue('BINVOICESERVICE_METHOD', $invoiceMethod);
 
                 $this->availMethods = $paymentOptions;
-            }
-            else
-            {
+            } else {
                 $this->availMethods = array();
             }
         }
@@ -178,8 +167,7 @@ class BmConfigHelper extends Helper
         $bmActivateStatuses = Configuration::get('BILLMATE_ACTIVATE_STATUS');
         $activateStatuses   = unserialize($bmActivateStatuses);
 
-        if (!$activateStatuses)
-        {
+        if (!$activateStatuses) {
             return [];
         }
 
