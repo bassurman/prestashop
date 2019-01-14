@@ -318,14 +318,22 @@ class BillmateGateway extends PaymentModule
             if (Dispatcher::getInstance()->getController() == 'billmatecheckout') {
                 $is_billmate_checkout_page = 'yes';
                 if (version_compare(_PS_VERSION_,'1.7','>=')) {
-                    $this->context->controller->registerStylesheet('module-billmategateway', 'modules/billmategateway/views/css/checkout/checkout.css', ['media' => 'all', 'priority' => 150]);
+                    $this->context->controller->registerStylesheet(
+                        'module-billmategateway',
+                        'modules/billmategateway/views/css/checkout/checkout.css',
+                        ['media' => 'all', 'priority' => 150]
+                    );
                 } else {
                     $this->context->controller->addCSS($css_file, 'all');
                 }
             }
 
             if (version_compare(_PS_VERSION_,'1.7','>=')) {
-                $this->context->controller->registerJavascript('module-billmategateway', 'modules/billmategateway/views/js/checkout/checkout.js', ['position' => 'bottom', 'priority' => 150]);
+                $this->context->controller->registerJavascript(
+                    'module-billmategateway',
+                    'modules/billmategateway/views/js/checkout/checkout.js',
+                    ['position' => 'bottom', 'priority' => 150]
+                );
             } else {
                 $this->context->controller->addJS($js_file);
             }
@@ -334,7 +342,19 @@ class BillmateGateway extends PaymentModule
                 $this->context->link->getModuleLink('billmategateway', 'billmatecheckout', array(), true)));
 
             Media::addJsDef(array('is_billmate_checkout_page' => $is_billmate_checkout_page));
+            return;
         }
+
+        $styleFile = 'payment-methods-17.css';
+        if (
+            version_compare(_PS_VERSION_, '1.6', '<') ||
+            version_compare(_PS_VERSION_,'1.6.1','=>')
+        ) {
+            $styleFile = 'payment-methods-16.css';
+        }
+
+        $this->context->controller->addCSS(__DIR__.'/views/css/' . $styleFile, 'all');
+        $this->context->controller->addCSS(__DIR__.'/views/css/payment-methods.css', 'all');
     }
 
     public function hookDisplayProductButtons($params)
@@ -520,11 +540,9 @@ class BillmateGateway extends PaymentModule
         $methods = $this->paymentModel->getActiveMethods();
 
         $template = 'new';
-        if (version_compare(_PS_VERSION_, '1.6', '<')) {
-            $template = 'legacy';
-        }
-
-        if (version_compare(_PS_VERSION_,'1.6.1','=>')) {
+        if (version_compare(_PS_VERSION_, '1.6', '<') ||
+            version_compare(_PS_VERSION_,'1.6.1','=>')
+        ) {
             $template = 'legacy';
         }
 
