@@ -130,6 +130,5 @@ class BillmateConfigForm
     public function l($string)
     {
         return Translate::getModuleTranslation($this->module_name, $string, $this->module_name);
-
     }
 }

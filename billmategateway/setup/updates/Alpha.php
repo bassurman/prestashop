@@ -19,8 +19,7 @@ class Alpha implements SetupFileInterface
 
     public function install()
     {
-        try
-        {
+        try {
             $drop = $this->db->execute('CREATE TABLE IF NOT EXISTS`'._DB_PREFIX_.'billmate_payment_fees` (
                                         `id` int AUTO_INCREMENT,
                                         `order_id` int,
@@ -30,9 +29,7 @@ class Alpha implements SetupFileInterface
                                         PRIMARY KEY(`id`));',false);
 
 
-        }
-        catch (Exception $e)
-        {
+        } catch (Exception $e) {
             echo $e;
             die();
         }
