@@ -638,6 +638,8 @@ class BMDataCollector
      */
     protected function getCartDetails()
     {
+        $delivery_option = $this->getDeliveryOption();
+        $this->context->cart->setDeliveryOption($delivery_option);
         return $this->context->cart->getSummaryDetails(null, true);
     }
 
